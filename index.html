@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inspecciones SITOC</title>
 <script>
-// Carga MSAL dinámicamente con fallback entre 3 CDNs
+// Carga MSAL dinámicamente con fallback entre 3 CDNs (CORREGIDO)
 (function() {
   var urls = [
     "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
-    "https://unpkg.com/@azure/msal-browser@2.38.3/dist/msal-browser.min.js",
-    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/dist/msal-browser.min.js"
+    "https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js",
+    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"
   ];
   var idx = 0;
   function cargar() {
