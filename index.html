@@ -4,8 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inspecciones SITOC</title>
-<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// Carga MSAL dinámicamente con fallback
+(function() {
+  var urls = [
+    "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
+    "https://unpkg.com/@azure/msal-browser@2.38.3/dist/msal-browser.min.js",
+    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/dist/msal-browser.min.js"
+  ];
+  var idx = 0;
+  function cargar() {
+    if (idx >= urls.length) {
+      document.getElementById("loginError").innerHTML =
+        '<div class="error-msg" style="margin-top:16px;max-width:320px;">No se pudo cargar la librería de autenticación. Verifica tu conexión a internet.</div>';
+      return;
+    }
+    var s = document.createElement("script");
+    s.src = urls[idx++];
+    s.onload = function() { console.log("MSAL cargado desde:", s.src); };
+    s.onerror = function() { console.warn("Falló:", s.src); cargar(); };
+    document.head.appendChild(s);
+  }
+  cargar();
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --azul:#0b3d5c;
@@ -404,3 +427,5 @@
 <script src="app.js"></script>
 </body>
 </html>
+
+
