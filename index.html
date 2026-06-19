@@ -48,7 +48,7 @@
   select,input[type=text],input[type=date],textarea{width:100%;padding:13px 12px;font-size:16px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:14px;background:#fff;color:var(--texto);font-family:inherit;}
   select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
   textarea{resize:vertical;min-height:80px;}
-  .campo-libre{border:1.5px dashed var(--gris-borde);border-radius:8px;padding:14px;margin-bottom:12px;position:relative;}
+  .campo-libre{border.1.5px dashed var(--gris-borde);border-radius:8px;padding:14px;margin-bottom:12px;position:relative;}
   .campo-libre input{margin-bottom:8px;}
   .campo-libre input:last-child{margin-bottom:0;}
   .btn-quitar-campo{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--rojo);font-size:18px;cursor:pointer;line-height:1;padding:4px 8px;}
@@ -83,7 +83,6 @@
 </head>
 <body>
 
-<!-- PANTALLA DE LOGIN -->
 <div id="pantallaLogin">
   <h1>Inspecciones SITOC</h1>
   <p>Inicia sesión con tu cuenta corporativa para registrar una inspección.</p>
@@ -91,7 +90,6 @@
   <div id="loginError"></div>
 </div>
 
-<!-- APP PRINCIPAL -->
 <div id="appPrincipal" class="oculto">
   <header>
     <div>
@@ -105,10 +103,15 @@
       <h2>Ubicación de trabajo</h2>
       <label for="selCliente">Cliente</label>
       <select id="selCliente"><option value="">Cargando...</option></select>
+      
       <label for="selProyecto">Proyecto</label>
       <select id="selProyecto" disabled><option value="">Elige un cliente primero</option></select>
+      
       <label for="selActividad">Actividad</label>
       <select id="selActividad" disabled><option value="">Elige un proyecto primero</option></select>
+      
+      <label for="selEstacion">Estación o sitio de trabajo</label>
+      <select id="selEstacion" disabled><option value="">Elige una actividad primero</option></select>
     </div>
     <div class="card">
       <h2>Datos generales</h2>
@@ -142,13 +145,11 @@
   </main>
 </div>
 
-<!-- OVERLAY DE ENVÍO -->
 <div id="estadoEnvio" class="oculto">
   <div class="spinner"></div>
   <p id="estadoEnvioTexto">Preparando envío...</p>
 </div>
 
-<!-- PANTALLA DE ÉXITO -->
 <div id="pantallaExito" class="oculto">
   <div class="check">&#10003;</div>
   <h2>Inspección enviada</h2>
@@ -158,12 +159,12 @@
 
 <script>
 // ============================================================
-// CONFIGURACIÓN
+// CONFIGURACIÓN (Agnóstica a Localhost o Producción)
 // ============================================================
 var CONFIG = {
   clientId: "8327d9b9-cf52-4245-9cdb-6f7a994ab69c",
   tenantId: "ef33d41c-b3e3-4e3f-958a-b0d14b400cf3",
-  redirectUri: "https://ryumark86.github.io/inspecciones-sitoc/",
+  redirectUri: window.location.origin + window.location.pathname,
   hostname: "sitoc.sharepoint.com",
   sitePath: "/sites/INSPECCIONES_EPCC",
   archivoConfiguracion: "configuracion.xlsx",
@@ -195,11 +196,13 @@ function iniciarApp() {
   var datosConfiguracion = [];
   var fotosCapturadas = [];
   var ubicacionCapturada = null;
+  var msalInicializado = false;
 
   // ---- LOGIN ----
   msalInstance.initialize().then(function() {
     return msalInstance.handleRedirectPromise();
   }).then(function() {
+    msalInicializado = true;
     var cuentas = msalInstance.getAllAccounts();
     if (cuentas.length > 0) {
       cuentaActual = cuentas[0];
@@ -208,6 +211,7 @@ function iniciarApp() {
       mostrarPantallaLogin();
     }
   }).catch(function(err) {
+    console.error("Error en inicialización de MSAL:", err);
     mostrarErrorLogin("Error al iniciar sesión: " + err.message);
     mostrarPantallaLogin();
   });
@@ -223,7 +227,11 @@ function iniciarApp() {
   }
 
   document.getElementById("btnLogin").addEventListener("click", function() {
-    msalInstance.loginRedirect({ scopes: SCOPES });
+    if (!msalInicializado) {
+      alert("La autenticación con Microsoft se está cargando. Espera un segundo.");
+      return;
+    }
+    msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
   });
 
   document.getElementById("btnLogout").addEventListener("click", function() {
@@ -234,7 +242,7 @@ function iniciarApp() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { return r.accessToken; })
       .catch(function() {
-        return msalInstance.acquireTokenRedirect({ scopes: SCOPES });
+        return msalInstance.acquireTokenRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
       });
   }
 
@@ -286,18 +294,20 @@ function iniciarApp() {
             return {
               cliente: String(f.Cliente || "").trim(),
               proyecto: String(f.Proyecto || "").trim(),
-              actividad: String(f.Actividad || "").trim()
+              actividad: String(f.Actividad || "").trim(),
+              estacion: String(f.Estacion || "").trim()
             };
-          }).filter(function(f) { return f.cliente && f.proyecto && f.actividad; });
+          }).filter(function(f) { return f.cliente && f.proyecto && f.actividad && f.estacion; });
           poblarSelectClientes();
         });
     });
   }
 
-  // ---- SELECTORES EN CASCADA ----
+  // ---- SELECTORES EN CASCADA (Manejador completo de 4 niveles) ----
   var selCliente = document.getElementById("selCliente");
   var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad");
+  var selEstacion = document.getElementById("selEstacion");
 
   function unicos(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
@@ -311,8 +321,11 @@ function iniciarApp() {
     var c = selCliente.value;
     selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
     selActividad.innerHTML = '<option value="">Elige un proyecto primero</option>';
+    selEstacion.innerHTML = '<option value="">Elige una actividad primero</option>';
     selActividad.disabled = true;
+    selEstacion.disabled = true;
     if (!c) { selProyecto.disabled = true; return; }
+    
     var proyectos = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
     selProyecto.innerHTML += proyectos.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join("");
     selProyecto.disabled = false;
@@ -321,10 +334,23 @@ function iniciarApp() {
   selProyecto.addEventListener("change", function() {
     var c = selCliente.value, p = selProyecto.value;
     selActividad.innerHTML = '<option value="">Selecciona una actividad</option>';
+    selEstacion.innerHTML = '<option value="">Elige una actividad primero</option>';
+    selEstacion.disabled = true;
     if (!p) { selActividad.disabled = true; return; }
+    
     var actividades = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
     selActividad.innerHTML += actividades.map(function(a) { return '<option value="' + a + '">' + a + '</option>'; }).join("");
     selActividad.disabled = false;
+  });
+
+  selActividad.addEventListener("change", function() {
+    var c = selCliente.value, p = selProyecto.value, a = selActividad.value;
+    selEstacion.innerHTML = '<option value="">Selecciona una estación o sitio</option>';
+    if (!a) { selEstacion.disabled = true; return; }
+    
+    var estaciones = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
+    selEstacion.innerHTML += estaciones.map(function(e) { return '<option value="' + e + '">' + e + '</option>'; }).join("");
+    selEstacion.disabled = false;
   });
 
   // ---- GPS ----
@@ -414,6 +440,7 @@ function iniciarApp() {
     if (!selCliente.value) return "Selecciona un cliente.";
     if (!selProyecto.value) return "Selecciona un proyecto.";
     if (!selActividad.value) return "Selecciona una actividad.";
+    if (!selEstacion.value) return "Selecciona una estación o sitio de trabajo.";
     if (!document.getElementById("inpTecnico").value.trim()) return "Escribe el nombre del técnico.";
     if (!document.getElementById("inpFecha").value) return "Selecciona la fecha.";
     if (fotosCapturadas.length === 0) return "Agrega al menos una foto.";
@@ -432,6 +459,7 @@ function iniciarApp() {
     var cliente = selCliente.value;
     var proyecto = selProyecto.value;
     var actividad = selActividad.value;
+    var estacion = selEstacion.value;
     var tecnico = document.getElementById("inpTecnico").value.trim();
     var fecha = document.getElementById("inpFecha").value;
     var notas = document.getElementById("inpNotas").value.trim();
@@ -443,7 +471,7 @@ function iniciarApp() {
     obtenerToken().then(function(token) {
       // 1. Excel de datos
       overlayTexto.textContent = "Generando archivo de datos...";
-      var blob = construirExcel({ cliente, proyecto, actividad, tecnico, fecha, notas, camposLibres });
+      var blob = construirExcel({ cliente, proyecto, actividad, estacion, tecnico, fecha, notas, camposLibres });
 
       // 2. Subir Excel
       overlayTexto.textContent = "Subiendo datos...";
@@ -467,7 +495,7 @@ function iniciarApp() {
       }).then(function(linkCarpeta) {
         // 5. Actualizar maestro
         overlayTexto.textContent = "Actualizando registro maestro...";
-        return agregarFilaMaestro(token, { fecha, tecnico, cliente, proyecto, actividad,
+        return agregarFilaMaestro(token, { fecha, tecnico, cliente, proyecto, actividad, estacion,
           ubicacion: ubicacionCapturada || "", linkCarpeta });
       }).then(function() {
         overlay.classList.add("oculto");
@@ -483,7 +511,7 @@ function iniciarApp() {
 
   function construirExcel(d) {
     var filasG = [["Campo","Valor"],["Cliente",d.cliente],["Proyecto",d.proyecto],
-      ["Actividad",d.actividad],["Técnico",d.tecnico],["Fecha",d.fecha],
+      ["Actividad",d.actividad],["Estación o sitio de trabajo",d.estacion],["Técnico",d.tecnico],["Fecha",d.fecha],
       ["Ubicación",ubicacionCapturada||"No capturada"],["Notas",d.notas||""]];
     var libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasG), "Datos generales");
@@ -518,10 +546,10 @@ function iniciarApp() {
         var nombre = libro.SheetNames[0];
         var filas = XLSX.utils.sheet_to_json(libro.Sheets[nombre], { defval: "" });
         filas.push({ Fecha: fila.fecha, Tecnico: fila.tecnico, Cliente: fila.cliente,
-          Proyecto: fila.proyecto, Actividad: fila.actividad,
+          Proyecto: fila.proyecto, Actividad: fila.actividad, Estacion: fila.estacion,
           Ubicacion: fila.ubicacion, Link_Carpeta: fila.linkCarpeta });
         libro.Sheets[nombre] = XLSX.utils.json_to_sheet(filas,
-          { header: ["Fecha","Tecnico","Cliente","Proyecto","Actividad","Ubicacion","Link_Carpeta"] });
+          { header: ["Fecha","Tecnico","Cliente","Proyecto","Actividad","Estacion","Ubicacion","Link_Carpeta"] });
         var bufNuevo = XLSX.write(libro, { type: "array", bookType: "xlsx" });
         return fetch(url, {
           method: "PUT",
@@ -545,6 +573,8 @@ function iniciarApp() {
     selProyecto.disabled = true;
     selActividad.innerHTML = '<option value="">Elige un proyecto primero</option>';
     selActividad.disabled = true;
+    selEstacion.innerHTML = '<option value="">Elige una actividad primero</option>';
+    selEstacion.disabled = true;
     renderizarFotos();
     document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
     document.getElementById("pantallaExito").classList.add("oculto");
