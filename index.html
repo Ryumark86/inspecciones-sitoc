@@ -57,15 +57,15 @@
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
   .btn-primario:disabled{background:#c9c9c9;cursor:not-allowed;}
   
-  /* Indicador sutil de GPS automático */
   .gps-status-bar {font-size: 13px; padding: 10px; border-radius: 6px; background: #eef1f3; margin-bottom: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px;}
   .gps-searching {color: var(--naranja);}
   .gps-success {color: var(--verde); background: #e6f4ea;}
   .gps-error {color: var(--rojo); background: #fce8e6;}
 
-  /* Nueva estructura de lista fotográfica interactiva */
-  .foto-item-row {border-bottom: 1px solid var(--gris-borde); padding: 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;}
+  /* Estructura fotográfica interactiva multi-foto */
+  .foto-item-row {border-bottom: 1px solid var(--gris-borde); padding: 16px 0; display: flex; flex-direction: column; gap: 8px;}
   .foto-item-row:last-child {border-bottom: none;}
+  .foto-item-header {display: flex; align-items: center; justify-content: space-between; gap: 12px;}
   .foto-item-info {flex: 1;}
   .foto-item-title {font-size: 14px; font-weight: 600; color: var(--texto);}
   .foto-item-status {font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 2px;}
@@ -73,8 +73,13 @@
   .status-tomada {color: var(--verde);}
   .status-na {color: #7f8c8d;}
   .foto-item-action button {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;}
-  .foto-item-action button.btn-revisar {background: #7f8c8d;}
-  .foto-item-preview {width: 45px; height: 45px; border-radius: 6px; object-fit: cover; border: 1px solid var(--gris-borde); display: block;}
+  .foto-item-action button.btn-revisar {background: #e8731c;}
+
+  /* Contenedor de miniaturas agrupadas */
+  .thumbs-container {display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;}
+  .thumb-wrapper {position: relative; width: 60px; height: 60px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde);}
+  .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover;}
+  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
 
   /* Modal de opciones para cada foto */
   .modal-opciones {position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px;}
@@ -100,6 +105,7 @@
   #pantallaExito h2{color:var(--azul-osc);margin-bottom:6px;}
   #pantallaExito p{color:#5a6b76;font-size:14px;margin-bottom:24px;}
   .error-msg{background:#fdecea;border:1px solid #f5c6c1;color:var(--rojo);padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+  .loading-watermark {font-size: 11px; color: var(--naranja); font-weight: bold; margin-top: 4px;}
 </style>
 </head>
 <body>
@@ -164,12 +170,12 @@
   </main>
 </div>
 
-<input type="file" id="inputCapturaNativa" accept="image/*">
+<input type="file" id="inputCapturaNativa" accept="image/*" multiple>
 
 <div id="modalOpcionesFoto" class="modal-opciones oculto">
   <div class="modal-content">
     <h3 id="modalTituloItem">Opciones de imagen</h3>
-    <button class="modal-btn modal-btn-foto" id="modalBtnCamara">&#128247; Capturar / Subir Foto</button>
+    <button class="modal-btn modal-btn-foto" id="modalBtnCamara">&#128247; Capturar / Agregar Fotos</button>
     <button class="modal-btn modal-btn-na" id="modalBtnNA">&#128683; Marcar como "No Aplica"</button>
     <button class="modal-btn modal-btn-cancelar" id="modalBtnCancelar">Cancelar</button>
   </div>
@@ -188,9 +194,6 @@
 </div>
 
 <script>
-// ============================================================
-// CONFIGURACIÓN (Agnóstica a Localhost o Producción)
-// ============================================================
 var CONFIG = {
   clientId: "8327d9b9-cf52-4245-9cdb-6f7a994ab69c",
   tenantId: "ef33d41c-b3e3-4e3f-958a-b0d14b400cf3",
@@ -202,7 +205,6 @@ var CONFIG = {
   carpetaRaizInspecciones: "Inspecciones"
 };
 
-// Estructura de ítems obligatorios requeridos
 var ITEMS_FOTOS_PLANTILLA = [
   "Foto linea de vista de la antena",
   "Foto panoramica de la antena lado derecho",
@@ -217,9 +219,6 @@ var ITEMS_FOTOS_PLANTILLA = [
   "Foto de la conexión y termoencogible cable de tierra"
 ];
 
-// ============================================================
-// LÓGICA PRINCIPAL (se ejecuta cuando MSAL está listo)
-// ============================================================
 function iniciarApp() {
   var msalConfig = {
     auth: {
@@ -241,13 +240,12 @@ function iniciarApp() {
   var datosConfiguracion = [];
   var msalInicializado = false;
 
-  // Estado global de las fotos y el GPS automático
   var estructuraFotos = [];
   var ubicacionCapturada = null;
   var gpsBuscando = false;
   var indiceItemSeleccionado = null;
+  var procesandoMarcasDeAgua = 0;
 
-  // ---- LOGIN ----
   msalInstance.initialize().then(function() {
     return msalInstance.handleRedirectPromise();
   }).then(function() {
@@ -295,7 +293,6 @@ function iniciarApp() {
       });
   }
 
-  // ---- APP PRINCIPAL ----
   function mostrarAppPrincipal() {
     document.getElementById("pantallaLogin").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
@@ -303,10 +300,7 @@ function iniciarApp() {
     var hoy = new Date();
     document.getElementById("inpFecha").value = hoy.toISOString().split("T")[0];
 
-    // Disparar captura GPS de fondo inmediatamente sin intervención del usuario
     capturarGPSAutomatico();
-
-    // Inicializar estructura limpia de control para el bloque de fotos
     inicializarBloqueFotos();
 
     resolverSitioYDrive()
@@ -358,7 +352,6 @@ function iniciarApp() {
     });
   }
 
-  // ---- SELECTORES EN CASCADA ----
   var selCliente = document.getElementById("selCliente");
   var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad");
@@ -408,7 +401,6 @@ function iniciarApp() {
     selEstacion.disabled = false;
   });
 
-  // ---- NUEVO MÓDULO: GPS AUTOMÁTICO SEGUNDO PLANO ----
   function capturarGPSAutomatico() {
     var bar = document.getElementById("gpsStatusBar");
     var txt = document.getElementById("gpsStatusTexto");
@@ -443,7 +435,6 @@ function iniciarApp() {
     );
   }
 
-  // ---- CAMPOS LIBRES ----
   document.getElementById("btnAgregarCampo").addEventListener("click", function() {
     var contenedor = document.getElementById("camposLibres");
     var div = document.createElement("div");
@@ -465,14 +456,13 @@ function iniciarApp() {
     return resultado;
   }
 
-  // ---- NUEVO MÓDULO: MANEJO DE FOTOS POR BLOQUES ESTRUCTURADOS ----
+  // ---- MANEJO MULTI-FOTO CON MARCA DE AGUA AUTOMÁTICA ----
   function inicializarBloqueFotos() {
     estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(nombreItem) {
       return {
         item: nombreItem,
         estado: "PENDIENTE", // PENDIENTE, TOMADA o NA
-        file: null,
-        previewUrl: ""
+        fotosList: [] // Lista de objetos { file: Blob/File, previewUrl: string }
       };
     });
     renderizarBloqueFotos();
@@ -485,6 +475,9 @@ function iniciarApp() {
     estructuraFotos.forEach(function(foto, idx) {
       var row = document.createElement("div");
       row.className = "foto-item-row";
+
+      var headerRow = document.createElement("div");
+      headerRow.className = "foto-item-header";
 
       var info = document.createElement("div");
       info.className = "foto-item-info";
@@ -500,7 +493,7 @@ function iniciarApp() {
         estado.textContent = "❌ Requerido";
         estado.className += " status-pendiente";
       } else if (foto.estado === "TOMADA") {
-        estado.textContent = "📸 Foto Cargada";
+        estado.textContent = "📸 " + foto.fotosList.length + " Foto(s) Cargada(s)";
         estado.className += " status-tomada";
       } else if (foto.estado === "NA") {
         estado.textContent = "🚫 No Aplica";
@@ -509,22 +502,14 @@ function iniciarApp() {
 
       info.appendChild(titulo);
       info.appendChild(estado);
-      row.appendChild(info);
-
-      // Miniatura si existe la imagen cargada
-      if (foto.estado === "TOMADA" && foto.previewUrl) {
-        var img = document.createElement("img");
-        img.src = foto.previewUrl;
-        img.className = "foto-item-preview";
-        row.appendChild(img);
-      }
+      headerRow.appendChild(info);
 
       var accion = document.createElement("div");
       accion.className = "foto-item-action";
       
       var btn = document.createElement("button");
       btn.type = "button";
-      btn.textContent = foto.estado === "PENDIENTE" ? "Gestionar" : "Modificar";
+      btn.textContent = foto.estado === "PENDIENTE" ? "Gestionar" : "Agregar / Modificar";
       if (foto.estado !== "PENDIENTE") btn.className = "btn-revisar";
       
       btn.addEventListener("click", function() {
@@ -532,12 +517,61 @@ function iniciarApp() {
       });
 
       accion.appendChild(btn);
-      row.appendChild(accion);
+      headerRow.appendChild(accion);
+      row.appendChild(headerRow);
+
+      // Si tiene fotos en su lista, renderiza las miniaturas abajo del renglón
+      if (foto.estado === "TOMADA" && foto.fotosList.length > 0) {
+        var thumbsCont = document.createElement("div");
+        thumbsCont.className = "thumbs-container";
+
+        foto.fotosList.forEach(function(fObj, fIdx) {
+          var wrap = document.createElement("div");
+          wrap.className = "thumb-wrapper";
+
+          var img = document.createElement("img");
+          img.src = fObj.previewUrl;
+          wrap.appendChild(img);
+
+          var btnDel = document.createElement("button");
+          btnDel.className = "btn-borrar-foto";
+          btnDel.type = "button";
+          btnDel.textContent = "x";
+          btnDel.addEventListener("click", function(e) {
+            e.stopPropagation();
+            eliminarFotoEspecifica(idx, fIdx);
+          });
+
+          wrap.appendChild(btnDel);
+          thumbsCont.appendChild(wrap);
+        });
+        row.appendChild(thumbsCont);
+      }
+      
+      if (procesandoMarcasDeAgua > 0 && indiceItemSeleccionado === idx) {
+        var loadingTxt = document.createElement("div");
+        loadingTxt.className = "loading-watermark";
+        loadingTxt.textContent = "Procesando y quemando datos en imagen...";
+        row.appendChild(loadingTxt);
+      }
+
       contenedor.appendChild(row);
     });
   }
 
-  // Controladores de Ventana Modal Interactiva
+  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
+    var item = estructuraFotos[itemIdx];
+    if (item.fotosList[fotoIdx].previewUrl) {
+      URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl);
+    }
+    item.fotosList.splice(fotoIdx, 1);
+    
+    if (item.fotosList.length === 0) {
+      item.estado = "PENDIENTE";
+    }
+    renderizarBloqueFotos();
+  }
+
   var modal = document.getElementById("modalOpcionesFoto");
   
   function abrirOpcionesItem(idx) {
@@ -553,13 +587,12 @@ function iniciarApp() {
 
   document.getElementById("modalBtnNA").addEventListener("click", function() {
     if (indiceItemSeleccionado !== null) {
-      // Si existía un ObjectURL anterior, revocarlo para liberar memoria
-      if (estructuraFotos[indiceItemSeleccionado].previewUrl) {
-        URL.revokeObjectURL(estructuraFotos[indiceItemSeleccionado].previewUrl);
-      }
+      // Limpiar fotos previas si decide marcar NA
+      estructuraFotos[indiceItemSeleccionado].fotosList.forEach(function(fObj) {
+        if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl);
+      });
       estructuraFotos[indiceItemSeleccionado].estado = "NA";
-      estructuraFotos[indiceItemSeleccionado].file = null;
-      estructuraFotos[indiceItemSeleccionado].previewUrl = "";
+      estructuraFotos[indiceItemSeleccionado].fotosList = [];
       
       modal.classList.add("oculto");
       renderizarBloqueFotos();
@@ -567,29 +600,92 @@ function iniciarApp() {
   });
 
   document.getElementById("modalBtnCamara").addEventListener("click", function() {
-    // Simula clic en el input file nativo del DOM
     document.getElementById("inputCapturaNativa").click();
   });
 
   document.getElementById("inputCapturaNativa").addEventListener("change", function(e) {
     if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
-      var file = e.target.files[0];
+      var files = Array.from(e.target.files);
+      modal.classList.add("oculto");
       
-      if (estructuraFotos[indiceItemSeleccionado].previewUrl) {
-        URL.revokeObjectURL(estructuraFotos[indiceItemSeleccionado].previewUrl);
+      // Si el ítem estaba en NA o PENDIENTE, lo cambiamos a TOMADA para empezar a acumular
+      if (estructuraFotos[indiceItemSeleccionado].estado !== "TOMADA") {
+        estructuraFotos[indiceItemSeleccionado].estado = "TOMADA";
       }
 
-      estructuraFotos[indiceItemSeleccionado].estado = "TOMADA";
-      estructuraFotos[indiceItemSeleccionado].file = file;
-      estructuraFotos[indiceItemSeleccionado].previewUrl = URL.createObjectURL(file);
+      var estacionText = selEstacion.value || "No seleccionada";
+      var coordsText = ubicacionCapturada || "Buscando o sin GPS";
       
-      modal.classList.add("oculto");
-      renderizarBloqueFotos();
+      var hoy = new Date();
+      var fechaHoraText = hoy.toLocaleDateString() + " " + hoy.toLocaleTimeString();
+
+      files.forEach(function(file) {
+        procesandoMarcasDeAgua++;
+        renderizarBloqueFotos();
+
+        estamparMarcaDeAgua(file, coordsText, estacionText, fechaHoraText, function(blobEstampado) {
+          if (blobEstampado) {
+            estructuraFotos[indiceItemSeleccionado].fotosList.push({
+              file: blobEstampado,
+              previewUrl: URL.createObjectURL(blobEstampado)
+            });
+          }
+          procesandoMarcasDeAgua--;
+          renderizarBloqueFotos();
+        });
+      });
     }
-    e.target.value = ""; // Limpiar el buffer del input file
+    e.target.value = ""; 
   });
 
-  // ---- ENVÍO ----
+  // ---- FUNCIÓN PROCESADORA DE CANVAS (QUEMAR DATOS) ----
+  function estamparMarcaDeAgua(file, coordenadas, estacion, fechaHora, callback) {
+    var lector = new FileReader();
+    lector.readAsDataURL(file);
+    lector.onload = function(evento) {
+      var img = new Image();
+      img.src = evento.target.result;
+      img.onload = function() {
+        var canvas = document.createElement("canvas");
+        var ctx = canvas.getContext("2d");
+
+        // Mantener las dimensiones reales de la cámara
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        // Ajustar dinámicamente el tamaño de la letra y el cintillo según la resolución
+        var altoCintillo = Math.round(canvas.height * 0.08); 
+        if (altoCintillo < 50) altoCintillo = 50; 
+        
+        var tamanoFuente = Math.round(altoCintillo * 0.25);
+        if (tamanoFuente < 12) tamanoFuente = 12;
+
+        // Dibujar franja oscura semitransparente abajo de la foto
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.fillRect(0, canvas.height - altoCintillo, canvas.width, altoCintillo);
+
+        // Estilo del texto quemado
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold " + tamanoFuente + "px Arial, sans-serif";
+        ctx.textBaseline = "middle";
+
+        var margenX = Math.round(canvas.width * 0.03);
+        var linea1Y = canvas.height - (altoCintillo * 0.7);
+        var linea2Y = canvas.height - (altoCintillo * 0.3);
+
+        // Escribir los datos solicitados en dos líneas claras
+        ctx.fillText("ESTACIÓN: " + estacion.toUpperCase(), margenX, linea1Y);
+        ctx.fillText("GPS: " + coordenadas + "  |  " + fechaHora, margenX, linea2Y);
+
+        // Convertir el canvas de nuevo a archivo comprimido tipo JPEG
+        canvas.toBlob(function(blob) {
+          callback(blob);
+        }, "image/jpeg", 0.85);
+      };
+    };
+  }
+
   function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
   function mostrarErrorEnvio(msg) {
     document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">' + msg + '</div>';
@@ -602,11 +698,11 @@ function iniciarApp() {
     if (!selEstacion.value) return "Selecciona una estación o sitio de trabajo.";
     if (!document.getElementById("inpTecnico").value.trim()) return "Escribe el nombre del técnico.";
     if (!document.getElementById("inpFecha").value) return "Selecciona la fecha.";
+    if (procesandoMarcasDeAgua > 0) return "Por favor espera a que terminen de procesarse las marcas de agua en las fotos.";
     
-    // Validar de manera estricta que ningún ítem se quede en estado "PENDIENTE"
     for (var i = 0; i < estructuraFotos.length; i++) {
       if (estructuraFotos[i].estado === "PENDIENTE") {
-        return "Falta responder la sección de fotos: '" + estructuraFotos[i].item + "' es obligatorio adjuntar foto o marcar como No Aplica.";
+        return "Falta responder la sección de fotos: '" + estructuraFotos[i].item + "' requiere que agregues fotos o selecciones No Aplica.";
       }
     }
     return null;
@@ -633,54 +729,55 @@ function iniciarApp() {
     var nombreCarpeta = limpiarNombre(actividad + "_" + fecha + "_" + hora + "_" + tecnico);
     var rutaBase = CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(cliente) + "/" + limpiarNombre(proyecto) + "/" + nombreCarpeta;
 
-    // Promesa interna sutil para esperar las coordenadas automáticas si el técnico fue extremadamente rápido enviando
     var promesaGPS = Promise.resolve();
     if (gpsBuscando && !ubicacionCapturada) {
       overlayTexto.textContent = "Esperando estabilización del GPS automático...";
       promesaGPS = new Promise(function(resolve) {
-        setTimeout(resolve, 3000); // Esperar máximo 3 segundos si sigue colgado calculando
+        setTimeout(resolve, 3000);
       });
     }
 
     promesaGPS.then(function() {
       return obtenerToken();
     }).then(function(token) {
-      // 1. Excel de datos consolidados
       overlayTexto.textContent = "Generando archivo de datos...";
       var blob = construirExcel({ cliente, proyecto, actividad, estacion, tecnico, fecha, notas, camposLibres });
 
-      // 2. Subir Excel
       overlayTexto.textContent = "Subiendo datos generales...";
       return subirArchivo(token, rutaBase + "/datos.xlsx", blob).then(function() {
         
-        // 3. Subir solo las fotos que aplican (Se descartan los ítems marcados como NA)
-        var fotosFiltradasParaSubir = estructuraFotos.filter(function(item) {
-          return item.estado === "TOMADA" && item.file !== null;
+        // Desglosar la lista de arreglos en un arreglo plano de subidas secuenciales
+        var listaPlanaSubidas = [];
+        estructuraFotos.forEach(function(item) {
+          if (item.estado === "TOMADA") {
+            item.fotosList.forEach(function(fObj, index) {
+              var indiceTexto = item.fotosList.length > 1 ? "_" + (index + 1) : "";
+              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + indiceTexto + ".jpg";
+              listaPlanaSubidas.push({
+                ruta: rutaBase + "/fotos/" + nombreArchivo,
+                file: fObj.file
+              });
+            });
+          }
         });
 
         var i = 0;
         function subirSiguiente() {
-          if (i >= fotosFiltradasParaSubir.length) return Promise.resolve();
-          overlayTexto.textContent = "Subiendo foto " + (i+1) + " de " + fotosFiltradasParaSubir.length + "...";
-          
-          // Se limpia el nombre del ítem de la plantilla para que sea el nombre físico del archivo .jpg en SharePoint
-          var nombreLimpioFoto = limpiarNombre(fotosFiltradasParaSubir[i].item).replace(/\s+/g, "_").toLowerCase() + ".jpg";
-          
-          return subirArchivo(token, rutaBase + "/fotos/" + nombreLimpioFoto, fotosFiltradasParaSubir[i].file).then(function() {
+          if (i >= listaPlanaSubidas.length) return Promise.resolve();
+          overlayTexto.textContent = "Subiendo foto " + (i+1) + " de " + listaPlanaSubidas.length + "...";
+          return subirArchivo(token, listaPlanaSubidas[i].ruta, listaPlanaSubidas[i].file).then(function() {
             i++;
             return subirSiguiente();
           });
         }
         return subirSiguiente();
       }).then(function() {
-        // 4. Link carpeta
         overlayTexto.textContent = "Generando enlace de evidencias...";
         return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaBase,
           { headers: { Authorization: "Bearer " + token } })
           .then(function(r) { return r.ok ? r.json() : {}; })
           .then(function(j) { return j.webUrl || ""; });
       }).then(function(linkCarpeta) {
-        // 5. Actualizar maestro centralizado
         overlayTexto.textContent = "Actualizando registro maestro...";
         return agregarFilaMaestro(token, { fecha, tecnico, cliente, proyecto, actividad, estacion,
           ubicacion: ubicacionCapturada || "Sin coordenadas", linkCarpeta });
@@ -688,7 +785,7 @@ function iniciarApp() {
         overlay.classList.add("oculto");
         document.getElementById("appPrincipal").classList.add("oculto");
         document.getElementById("pantallaExito").classList.remove("oculto");
-        document.getElementById("exitoDetalle").textContent = "Los datos generales y las fotos aplicadas quedaron guardados en SharePoint correctamente.";
+        document.getElementById("exitoDetalle").textContent = "Los datos generales y todas las fotos estampadas se guardaron correctamente.";
       });
     }).catch(function(e) {
       overlay.classList.add("oculto");
@@ -697,7 +794,6 @@ function iniciarApp() {
   });
 
   function construirExcel(d) {
-    // Se añade columna extra para dejar trazabilidad de qué ítems fotográficos aplicaron y cuáles fueron descartados como NA
     var filasG = [
       ["Campo","Valor"],
       ["Cliente",d.cliente],
@@ -710,13 +806,13 @@ function iniciarApp() {
       ["Notas",d.notas||""]
     ];
     
-    var libro = XLSX.utils.book_new();
+    var libro = XLSX.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasG), "Datos generales");
     
-    // Pestaña adicional para revisar el estatus del Bloque Fotográfico adjunto en el Excel individual
-    var filasFotosReporte = [["Ítem Fotográfico Obligatorio", "Estatus en Campo"]];
+    var filasFotosReporte = [["Ítem Fotográfico Obligatorio", "Estatus en Campo", "Cantidad de fotos"]];
     estructuraFotos.forEach(function(f) {
-      filasFotosReporte.push([f.item, f.estado === "TOMADA" ? "Cargada (Ver Carpeta Fotos)" : "No Aplica"]);
+      var cant = f.estado === "TOMADA" ? f.fotosList.length : 0;
+      filasFotosReporte.push([f.item, f.estado === "TOMADA" ? "Cargada" : "No Aplica", cant]);
     });
     XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasFotosReporte), "Estatus Fotos Bloque 1");
 
@@ -766,17 +862,16 @@ function iniciarApp() {
       });
   }
 
-  // ---- REINICIO ----
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() {
-    // Revocar las URL creadas en memoria para evitar saturación del dispositivo móvil
-    estructuraFotos.forEach(function(f) {
-      if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
+    estructuraFotos.forEach(function(item) {
+      item.fotosList.forEach(function(fObj) {
+        if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl);
+      });
     });
 
     document.getElementById("camposLibres").innerHTML = "";
     document.getElementById("inpNotas").value = "";
     
-    // Disparar nuevo ciclo de GPS y reseteo de tabla estructural de fotos
     capturarGPSAutomatico();
     inicializarBloqueFotos();
 
@@ -794,7 +889,6 @@ function iniciarApp() {
   });
 }
 
-// ---- ARRANQUE: espera a que MSAL cargue ----
 function esperarMSAL(intentos) {
   if (typeof msal !== "undefined") {
     iniciarApp();
