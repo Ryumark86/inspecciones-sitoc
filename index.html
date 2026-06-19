@@ -168,7 +168,7 @@ var CONFIG = {
   redirectUri: window.location.origin + window.location.pathname,
   hostname: "sitoc.sharepoint.com",
   sitePath: "/sites/INSPECCIONES_EPCC",
-  archivoConfiguracion: "configuracion.csv",
+  archivoConfiguracion: "configuracion.csv", // <-- CAMBIADO A CSV PARA TOTAL COMPATIBILIDAD NATIVA
   archivoMaestro: "maestro_inspecciones.csv",
   carpetaRaizInspecciones: "Inspecciones"
 };
@@ -187,61 +187,39 @@ var ITEMS_FOTOS_PLANTILLA = [
   "Foto de la conexión y termoencogible cable de tierra"
 ];
 
-// PROCESADOR ESTRUCTURADO PARA XLSX SIN DEPENDENCIAS CDN
-function procesarExcelNativo(arrayBuffer) {
+// PROCESADOR NATIVO DE ARCHIVO CSV - 100% ESTABLE Y RÁPIDO
+function procesarCSVNativo(textoPlano) {
   try {
-    var bytes = new Uint8Array(arrayBuffer);
-    var texto = "";
-    // Conversión por bloques optimizada para strings grandes de Excel
-    var chunkSize = 65536;
-    for (var i = 0; i < bytes.length; i += chunkSize) {
-      texto += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-    }
-
+    var lineas = textoPlano.split(/\r?\n/);
     var filasMapeadas = [];
-    // Buscamos todas las cadenas legibles dentro de las estructuras compartidas (<t>) del archivo empaquetado
-    var regexTextos = /<t[^>]*>([^<]+)<\/t>/g;
-    var textoCoincidencias = [];
-    var match;
     
-    while ((match = regexTextos.exec(texto)) !== null) {
-      var val = match[1].trim();
-      if (val && !val.includes("xml") && val.length > 1) {
-        textoCoincidencias.push(val);
-      }
-    }
+    for (var i = 0; i < lineas.length; i++) {
+      var linea = lineas[i].trim();
+      if (!linea) continue;
 
-    // Si encontramos textos legibles correlativos, removemos los encabezados e indexamos el árbol
-    var inicioValores = -1;
-    for (var j = 0; j < textoCoincidencias.length; j++) {
-      var t = textoCoincidencias[j].toLowerCase();
-      if (t === "cliente" || t === "proyecto" || t === "actividad") {
-        inicioValores = j + 4; // Nos saltamos la primera fila (Cabecera de 4 columnas)
-        break;
-      }
-    }
+      // Detecta si el archivo viene separado por comas o punto y coma automáticamente
+      var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
+      
+      var cli = celdas[0] ? celdas[0].trim() : "";
+      var pro = celdas[1] ? celdas[1].trim() : "";
+      var act = celdas[2] ? celdas[2].trim() : "";
+      var est = celdas[3] ? celdas[3].trim() : "";
 
-    if (inicioValores === -1) inicioValores = 0;
-
-    for (var k = inicioValores; k < textoCoincidencias.length; k += 4) {
-      var cli = textoCoincidencias[k];
-      var pro = textoCoincidencias[k+1];
-      var act = textoCoincidencias[k+2];
-      var est = textoCoincidencias[k+3];
+      // Saltar la cabecera ("cliente", "cliente/proyecto") si existe
+      if (i === 0 && cli.toLowerCase().includes("client")) continue;
 
       if (cli && pro) {
         filasMapeadas.push({
           cliente: cli.toUpperCase(),
           proyecto: pro.toUpperCase(),
           actividad: act ? act.toUpperCase() : "INSTALACION",
-          estacion: est ? est.toUpperCase() : "SITIO RELEVADO"
+          estacion: est ? est.toUpperCase() : "SITIO GENERAL"
         });
       }
     }
-
     return filasMapeadas.length > 0 ? filasMapeadas : null;
   } catch(e) {
-    console.error("Fallo en decodificador nativo binario", e);
+    console.error("Error interpretando texto CSV", e);
     return null;
   }
 }
@@ -332,26 +310,25 @@ function iniciarApp() {
 
   function descargarYLeerConfiguracion() {
     return obtenerToken().then(function(token) {
-      // El fetch correcto usando Microsoft Graph que apunta al archivo dinámico de tu SharePoint
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) {
-          if (!r.ok) throw new Error("No se pudo descargar el archivo configuracion.csv desde SharePoint.");
-          return r.arrayBuffer();
+          if (!r.ok) throw new Error("No se encontró el archivo configuracion.csv en SharePoint.");
+          return r.text(); // Descarga directa como texto plano ligero
         })
-        .then(function(buffer) {
-          var datosObtenidos = procesarExcelNativo(buffer);
+        .then(function(textoPlano) {
+          var datosObtenidos = procesarCSVNativo(textoPlano);
           
           if (datosObtenidos && datosObtenidos.length > 0) {
             datosConfiguracion = datosObtenidos;
           } else {
-            throw new Error("El archivo no contiene filas legibles estructuradas.");
+            throw new Error("El archivo CSV no contiene datos válidos.");
           }
           poblarSelectClientes();
         }).catch(function(err) {
-          console.warn("Fallo lectura dinámica, usando estructura de contingencia", err);
-          document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">Aviso: Cargada lista de contingencia básica. Verifica que configuracion.csv tenga datos válidos.</div>';
+          console.warn("Fallo lectura, usando contingencia", err);
+          document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">Aviso: No se pudo leer configuracion.csv. Cargando lista de contingencia básica.</div>';
           datosConfiguracion = [
-            { cliente: "HUGHESNET", proyecto: "CONECTIVIDAD RURAL", actividad: "INSTALACION DE ANTENAS", estacion: "SITIO RELEVADO PRUEBA" }
+            { cliente: "HUGHESNET", proyecto: "CONECTIVIDAD RURAL", actividad: "INSTALACION DE ANTENAS", estacion: "SITIO RELEVADO CONTIN" }
           ];
           poblarSelectClientes();
         });
@@ -697,7 +674,7 @@ function iniciarApp() {
         overlay.classList.add("oculto");
         document.getElementById("appPrincipal").classList.add("oculto");
         document.getElementById("pantallaExito").classList.remove("oculto");
-        document.getElementById("exitoDetalle").textContent = "Inspección completada. Las listas y los datos se guardaron correctamente.";
+        document.getElementById("exitoDetalle").textContent = "Inspección completada. Las listas y las fotos múltiples con marcas de agua se subieron correctamente.";
       });
     }).catch(function(e) {
       overlay.classList.add("oculto");
@@ -749,13 +726,13 @@ function iniciarApp() {
         if (!r.ok) {
           var cabecera = "\uFEFFFecha;Tecnico;Cliente;Proyecto;Actividad;Estacion;Ubicacion;Link_Carpeta\r\n";
           var nuevaFila = fila.fecha + ";" + fila.tecnico + ";" + fila.cliente + ";" + fila.proyecto + ";" + fila.actividad + ";" + fila.estacion + ";" + fila.ubicacion + ";" + fila.linkCarpeta + "\r\n";
-          return subirArchivo(CONFIG.archivoMaestro, new Blob([cabecera + nuevaFila], { type: "text/csv;charset=utf-8;" }));
+          return subirArchivo(token, CONFIG.archivoMaestro, new Blob([cabecera + nuevaFila], { type: "text/csv;charset=utf-8;" }));
         }
         return r.text().then(function(textoActual) {
           var nuevaFila = fila.fecha + ";" + fila.tecnico + ";" + fila.cliente + ";" + fila.proyecto + ";" + fila.actividad + ";" + fila.estacion + ";" + fila.ubicacion + ";" + fila.linkCarpeta + "\r\n";
-          return subirArchivo(CONFIG.archivoMaestro, new Blob([textoActual + nuevaFila], { type: "text/csv;charset=utf-8;" }));
+          return subirArchivo(token, CONFIG.archivoMaestro, new Blob([textoActual + nuevaFila], { type: "text/csv;charset=utf-8;" }));
         });
-      }).catch(function(err){ console.warn("Log guardado", err); });
+      }).catch(function(err){ console.warn("Log guardado histórico", err); });
   }
 
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() {
