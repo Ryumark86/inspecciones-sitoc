@@ -48,7 +48,7 @@
   select,input[type=text],input[type=date],textarea{width:100%;padding:13px 12px;font-size:16px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:14px;background:#fff;color:var(--texto);font-family:inherit;}
   select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
   textarea{resize:vertical;min-height:80px;}
-  .campo-libre{border.1.5px dashed var(--gris-borde);border-radius:8px;padding:14px;margin-bottom:12px;position:relative;}
+  .campo-libre{border:1.5px dashed var(--gris-borde);border-radius:8px;padding:14px;margin-bottom:12px;position:relative;}
   .campo-libre input{margin-bottom:8px;}
   .campo-libre input:last-child{margin-bottom:0;}
   .btn-quitar-campo{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--rojo);font-size:18px;cursor:pointer;line-height:1;padding:4px 8px;}
@@ -173,7 +173,7 @@ var CONFIG = {
 };
 
 // ============================================================
-// LÓGICA PRINCIPAL (se ejecuta cuando MSAL está listo)
+// LÓGICA PRINCIPAL
 // ============================================================
 function iniciarApp() {
   var msalConfig = {
@@ -292,10 +292,10 @@ function iniciarApp() {
           var filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
           datosConfiguracion = filas.map(function(f) {
             return {
-              cliente: String(f.Cliente || "").trim(),
-              proyecto: String(f.Proyecto || "").trim(),
-              actividad: String(f.Actividad || "").trim(),
-              estacion: String(f.Estacion || "").trim()
+              cliente: String(f.Cliente || f.cliente || "").trim(),
+              proyecto: String(f.Proyecto || f.proyecto || "").trim(),
+              actividad: String(f.Actividad || f.actividad || "").trim(),
+              estacion: String(f.Estacion || f.Estación || f.estacion || f.estación || "").trim()
             };
           }).filter(function(f) { return f.cliente && f.proyecto && f.actividad && f.estacion; });
           poblarSelectClientes();
@@ -303,7 +303,7 @@ function iniciarApp() {
     });
   }
 
-  // ---- SELECTORES EN CASCADA (Manejador completo de 4 niveles) ----
+  // ---- SELECTORES EN CASCADA ----
   var selCliente = document.getElementById("selCliente");
   var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad");
@@ -404,12 +404,85 @@ function iniciarApp() {
     return resultado;
   }
 
-  // ---- FOTOS ----
+  // ---- 🔥 MOTOR DE PROCESAMIENTO Y QUEMADO DE DATOS (NIVEL SENIOR) 🔥 ----
+  function quemarDatosEnFoto(file, callback) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement("canvas");
+        var ctx = canvas.getContext("2d");
+        
+        // Mantiene la resolución real de la fotografía capturada
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Calcula el tamaño de la fuente proporcional al tamaño de la imagen (2.5% del ancho)
+        var tasis = Math.max(18, Math.floor(canvas.width * 0.025));
+        ctx.font = "bold " + tasis + "px Arial, Helvetica, sans-serif";
+        ctx.textBaseline = "bottom";
+        
+        // Recopilación de metadatos dinámicos del formulario
+        var txtEstacion = "ESTACION: " + (selEstacion.value || "No seleccionada");
+        var txtGPS = "COORDENADAS: " + (ubicacionCapturada || "No capturadas (GPS desactivado)");
+        var ahora = new Date();
+        var txtFechaHora = "FECHA/HORA: " + ahora.toLocaleDateString() + " " + ahora.toTimeString().split(" ")[0];
+        
+        var líneasTexto = [txtEstacion, txtGPS, txtFechaHora];
+        
+        // Configuración defensiva de dibujo: Relleno blanco con contorno negro
+        // Esto evita ocultar datos de fondo detrás de barras negras sólidas destructivas
+        ctx.fillStyle = "#FFFFFF"; 
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = Math.max(2, Math.floor(tasis * 0.15)); // Grosor del borde proporcional
+        
+        var paddingX = tasis * 0.8;
+        var paddingY = tasis * 1.2;
+        
+        // Dibuja las líneas de texto de abajo hacia arriba en la esquina inferior izquierda
+        for (var i = líneasTexto.length - 1; i >= 0; i--) {
+          var x = paddingX;
+          var y = canvas.height - paddingY - ((líneasTexto.length - 1 - i) * tasis * 1.3);
+          
+          ctx.strokeText(líneasTexto[i], x, y);
+          ctx.fillText(líneasTexto[i], x, y);
+        }
+        
+        // Exporta la imagen procesada a JPEG comprimido al 85%
+        // Rompe el límite de los 4MB reduciendo el archivo a ~1.2MB manteniendo excelente nitidez
+        canvas.toBlob(function(blob) {
+          var archivoQuemado = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" });
+          callback(archivoQuemado);
+        }, "image/jpeg", 0.85);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function agregarFotos(fileList) {
-    Array.from(fileList).forEach(function(file) {
-      fotosCapturadas.push({ file: file, previewUrl: URL.createObjectURL(file) });
+    var arrFiles = Array.from(fileList);
+    if(arrFiles.length === 0) return;
+    
+    var contadorHint = document.getElementById("contadorFotos");
+    var btnEnviar = document.getElementById("btnEnviar");
+    
+    contadorHint.textContent = "Procesando y estampando datos en imágenes... Espera.";
+    btnEnviar.disabled = true; // Bloqueo preventivo de envío durante el renderizado asíncrono
+    
+    var procesadas = 0;
+    arrFiles.forEach(function(file) {
+      quemarDatosEnFoto(file, function(archivoQuemado) {
+        fotosCapturadas.push({ file: archivoQuemado, previewUrl: URL.createObjectURL(archivoQuemado) });
+        procesadas++;
+        
+        if (procesadas === arrFiles.length) {
+          renderizarFotos();
+          btnEnviar.disabled = false;
+        }
+      });
     });
-    renderizarFotos();
   }
 
   document.getElementById("inputCamara").addEventListener("change", function(e) {
@@ -425,7 +498,7 @@ function iniciarApp() {
       return '<div class="foto-thumb"><img src="' + foto.previewUrl + '">' +
         '<button type="button" onclick="window._quitarFoto(' + idx + ')">x</button></div>';
     }).join("");
-    document.getElementById("contadorFotos").textContent = fotosCapturadas.length + " foto(s) agregada(s)";
+    document.getElementById("contadorFotos").textContent = fotosCapturadas.length + " foto(s) con metadatos acoplada(s)";
   }
 
   window._quitarFoto = function(idx) { fotosCapturadas.splice(idx, 1); renderizarFotos(); };
@@ -582,7 +655,7 @@ function iniciarApp() {
   });
 }
 
-// ---- ARRANQUE: espera a que MSAL cargue ----
+// ---- ARRANQUE ----
 function esperarMSAL(intentos) {
   if (typeof msal !== "undefined") {
     iniciarApp();
