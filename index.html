@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inspecciones SITOC - MultiFoto & Marca de Agua</title>
 <script>
+// Carga MSAL dinámicamente con fallback entre 3 CDNs
 (function() {
   var urls = [
     "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
@@ -21,8 +22,25 @@
   }
   cargar();
 })();
+
+// Carga XLSX (SheetJS) dinámicamente con fallback entre 3 CDNs para evitar "XLSX.book_new is not a function"
+(function() {
+  var urls = [
+    "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+    "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+  ];
+  var idx = 0;
+  function cargarXLSX() {
+    if (idx >= urls.length) return;
+    var s = document.createElement("script");
+    s.src = urls[idx++];
+    s.onerror = function() { cargarXLSX(); };
+    document.head.appendChild(s);
+  }
+  cargarXLSX();
+})();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --azul:#0b3d5c;
@@ -49,7 +67,6 @@
   select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
   textarea{resize:vertical;min-height:80px;}
   
-  .btn-secundario{width:100%;padding:12px;background:var(--gris-claro);border:1.5px dashed var(--azul);color:var(--azul);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
   .btn-primario:disabled{background:#c9c9c9;cursor:not-allowed;}
   
@@ -74,7 +91,7 @@
   .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;}
   .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;}
 
-  /* Galería de fotos acumuladas (Múltiples fotos por ítem) */
+  /* Galería de fotos acumuladas */
   .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
   .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
   .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover;}
@@ -92,8 +109,7 @@
   #pantallaExito{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:24px;text-align:center;}
   #pantallaExito .check{width:64px;height:64px;background:var(--verde);border-radius:50%;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
   .error-msg{background:#fdecea;border:1px solid #f5c6c1;color:var(--rojo);padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
-  .loading-watermark {font-size: 12px; color: var(--naranja); font-weight: bold; animation: pulse 1s infinite alternate; margin-top: 4px;}
-  @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+  .loading-watermark {font-size: 12px; color: var(--naranja); font-weight: bold; margin-top: 4px;}
 </style>
 </head>
 <body>
@@ -142,8 +158,8 @@
     </div>
     
     <div class="card">
-      <h2 id="txtTituloBloque">BLOQUE: 1 INSTALACION DE ANTENAS</h2>
-      <div class="subtitulo-bloque" id="txtSubtituloBloque">Fotos requeridas (Puedes agregar varias fotos por cada ítem)</div>
+      <h2>BLOQUE: 1 INSTALACION DE ANTENAS</h2>
+      <div class="subtitulo-bloque">Fotos requeridas (Puedes agregar varias fotos por cada ítem)</div>
       
       <div id="listaFotosEstructurada"></div>
     </div>
@@ -282,6 +298,9 @@ function iniciarApp() {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { return r.arrayBuffer(); })
         .then(function(buffer) {
+          if (typeof XLSX === "undefined") {
+            throw new Error("La librería de Excel no se ha cargado aún. Revisa tu conexión a internet.");
+          }
           var libro = XLSX.read(buffer, { type: "array" });
           var hoja = libro.Sheets[libro.SheetNames[0]];
           var filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
@@ -344,7 +363,7 @@ function iniciarApp() {
     var bar = document.getElementById("gpsStatusBar");
     var txt = document.getElementById("gpsStatusTexto");
     bar.className = "gps-status-bar gps-searching";
-    ubicacionCaptured = null;
+    ubicacionCapturada = null;
     gpsBuscando = true;
 
     if (!navigator.geolocation) {
@@ -369,14 +388,9 @@ function iniciarApp() {
     );
   }
 
-  // ---- NUEVA LOGICA DE ESTRUCTURA ACUMULATIVA MULTIFOTO ----
   function inicializarBloqueFotos() {
     estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(nombreItem) {
-      return {
-        item: nombreItem,
-        estado: "PENDIENTE", 
-        fotosList: [] 
-      };
+      return { item: nombreItem, estado: "PENDIENTE", fotosList: [] };
     });
     renderizarBloqueFotos();
   }
@@ -417,7 +431,6 @@ function iniciarApp() {
       info.appendChild(estado);
       headerRow.appendChild(info);
 
-      // Botones directos en la fila sin modales confusos
       var actionsLayout = document.createElement("div");
       actionsLayout.className = "foto-item-actions-layout";
 
@@ -427,7 +440,7 @@ function iniciarApp() {
       btnFoto.innerHTML = "<span>&#128247;</span> Añadir foto";
       btnFoto.addEventListener("click", function() {
         indiceItemSeleccionado = idx;
-        document.getElementById("inputCapturaNativa").click(); // Abre la cámara
+        document.getElementById("inputCapturaNativa").click();
       });
 
       var btnNA = document.createElement("button");
@@ -443,7 +456,6 @@ function iniciarApp() {
       headerRow.appendChild(actionsLayout);
       row.appendChild(headerRow);
 
-      // Render de miniaturas acumuladas abajo del renglón si existen
       if (foto.estado === "TOMADA" && foto.fotosList.length > 0) {
         var thumbsCont = document.createElement("div");
         thumbsCont.className = "thumbs-container";
@@ -500,7 +512,6 @@ function iniciarApp() {
     renderizarBloqueFotos();
   }
 
-  // Captura el disparo de archivos de la cámara nativa y los acumula uno a uno
   document.getElementById("inputCapturaNativa").addEventListener("change", function(e) {
     if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
       var files = Array.from(e.target.files);
@@ -531,10 +542,9 @@ function iniciarApp() {
         });
       });
     }
-    e.target.value = ""; // Limpia el input para permitir re-capturas consecutivas en iOS/Android
+    e.target.value = ""; 
   });
 
-  // ---- PROCESADOR DE CANVAS CORREGIDO PARA FORZAR EL "QUEMADO" ----
   function estamparMarcaDeAgua(file, coordenadas, estacion, fechaHora, callback) {
     var lector = new FileReader();
     lector.readAsDataURL(file);
@@ -545,25 +555,19 @@ function iniciarApp() {
         var canvas = document.createElement("canvas");
         var ctx = canvas.getContext("2d");
 
-        // Dimensiones exactas de la captura de cámara nativa
         canvas.width = img.width;
         canvas.height = img.height;
-        
-        // Dibujar imagen base
         ctx.drawImage(img, 0, 0, img.width, img.height);
 
-        // Calcular proporciones dinámicas según la resolución de la foto
         var altoCintillo = Math.round(canvas.height * 0.09); 
         if (altoCintillo < 70) altoCintillo = 70; 
         
         var tamanoFuente = Math.round(altoCintillo * 0.24);
         if (tamanoFuente < 15) tamanoFuente = 15;
 
-        // 1. Dibujar fondo oscuro semitransparente abajo
         ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
         ctx.fillRect(0, canvas.height - altoCintillo, canvas.width, altoCintillo);
 
-        // 2. Propiedades de texto
         ctx.fillStyle = "#FFFFFF"; 
         ctx.font = "bold " + tamanoFuente + "px Arial, sans-serif";
         ctx.textBaseline = "middle";
@@ -572,11 +576,9 @@ function iniciarApp() {
         var linea1Y = canvas.height - (altoCintillo * 0.68);
         var linea2Y = canvas.height - (altoCintillo * 0.32);
 
-        // 3. Escribir datos reales "quemados" encima de la imagen
         ctx.fillText("ESTACIÓN: " + estacion.toUpperCase(), margenX, linea1Y);
         ctx.fillText("GPS: " + coordenadas + "  |  " + fechaHora, margenX, linea2Y);
 
-        // Convertir canvas a un archivo Blob físico compilado en formato JPEG
         canvas.toBlob(function(blob) {
           callback(blob);
         }, "image/jpeg", 0.90);
@@ -594,6 +596,7 @@ function iniciarApp() {
     if (!document.getElementById("inpTecnico").value.trim()) return "Escribe el nombre del técnico.";
     if (!document.getElementById("inpFecha").value) return "Selecciona la fecha.";
     if (procesandoMarcasDeAgua > 0) return "Espera a que terminen de procesarse las marcas de agua.";
+    if (typeof XLSX === "undefined") return "La librería Excel no se cargó correctamente. Revisa tu conexión.";
     
     for (var i = 0; i < estructuraFotos.length; i++) {
       if (estructuraFotos[i].estado === "PENDIENTE") {
@@ -630,17 +633,13 @@ function iniciarApp() {
       overlayTexto.textContent = "Subiendo archivo index maestro...";
       return subirArchivo(token, rutaBase + "/datos.xlsx", blob).then(function() {
         
-        // Desglosar la lista acumulada de múltiples fotos por ítem a una lista plana de subidas
         var listaPlanaSubidas = [];
         estructuraFotos.forEach(function(item) {
           if (item.estado === "TOMADA") {
             item.fotosList.forEach(function(fObj, index) {
               var enumerador = "_" + (index + 1);
               var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + enumerador + ".jpg";
-              listaPlanaSubidas.push({
-                ruta: rutaBase + "/fotos/" + nombreArchivo,
-                file: fObj.file
-              });
+              listaPlanaSubidas.push({ ruta: rutaBase + "/fotos/" + nombreArchivo, file: fObj.file });
             });
           }
         });
@@ -648,7 +647,7 @@ function iniciarApp() {
         var i = 0;
         function subirSiguiente() {
           if (i >= listaPlanaSubidas.length) return Promise.resolve();
-          overlayTexto.textContent = "Subiendo archivo fotográfico estampada " + (i+1) + " de " + listaPlanaSubidas.length + "...";
+          overlayTexto.textContent = "Subiendo foto estampada " + (i+1) + " de " + listaPlanaSubidas.length + "...";
           return subirArchivo(token, listaPlanaSubidas[i].ruta, listaPlanaSubidas[i].file).then(function() {
             i++;
             return subirSiguiente();
@@ -687,7 +686,9 @@ function iniciarApp() {
       ["Ubicación GPS", ubicacionCapturada || "No registrada"],
       ["Notas",d.notas||""]
     ];
-    var libro = XLSX.book_new();
+    
+    // Cambiado a sintaxis explícita recomendada por SheetJS
+    var libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasG), "Datos generales");
     
     var filasFotosReporte = [["Ítem Fotográfico Obligatorio", "Estatus en Campo", "Cantidad de fotos registradas"]];
@@ -746,7 +747,7 @@ function iniciarApp() {
 }
 
 function esperarMSAL(intentos) {
-  if (typeof msal !== "undefined") { iniciarApp(); }
+  if (typeof msal !== "undefined" && typeof XLSX !== "undefined") { iniciarApp(); }
   else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
 }
 window.addEventListener("load", function() { esperarMSAL(25); });
