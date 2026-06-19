@@ -168,7 +168,7 @@ var CONFIG = {
   redirectUri: window.location.origin + window.location.pathname,
   hostname: "sitoc.sharepoint.com",
   sitePath: "/sites/INSPECCIONES_EPCC",
-  archivoConfiguracion: "configuracion.xlsx",
+  archivoConfiguracion: "configuracion.csv",
   archivoMaestro: "maestro_inspecciones.csv",
   carpetaRaizInspecciones: "Inspecciones"
 };
@@ -335,7 +335,7 @@ function iniciarApp() {
       // El fetch correcto usando Microsoft Graph que apunta al archivo dinámico de tu SharePoint
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) {
-          if (!r.ok) throw new Error("No se pudo descargar el archivo configuracion.xlsx desde SharePoint.");
+          if (!r.ok) throw new Error("No se pudo descargar el archivo configuracion.csv desde SharePoint.");
           return r.arrayBuffer();
         })
         .then(function(buffer) {
@@ -349,7 +349,7 @@ function iniciarApp() {
           poblarSelectClientes();
         }).catch(function(err) {
           console.warn("Fallo lectura dinámica, usando estructura de contingencia", err);
-          document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">Aviso: Cargada lista de contingencia básica. Verifica que configuracion.xlsx tenga datos válidos.</div>';
+          document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">Aviso: Cargada lista de contingencia básica. Verifica que configuracion.csv tenga datos válidos.</div>';
           datosConfiguracion = [
             { cliente: "HUGHESNET", proyecto: "CONECTIVIDAD RURAL", actividad: "INSTALACION DE ANTENAS", estacion: "SITIO RELEVADO PRUEBA" }
           ];
