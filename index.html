@@ -308,29 +308,34 @@ function iniciarApp() {
     });
   }
 
-  function descargarYLeerConfiguracion() {
+ function descargarYLeerConfiguracion() {
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) {
-          if (!r.ok) throw new Error("No se encontró el archivo configuracion.csv en SharePoint.");
-          return r.text(); // Descarga directa como texto plano ligero
+          if (!r.ok) {
+            return r.text().then(function(textoError) {
+              throw new Error("Código " + r.status + " de SharePoint: " + textoError);
+            });
+          }
+          return r.text();
         })
         .then(function(textoPlano) {
           var datosObtenidos = procesarCSVNativo(textoPlano);
           
           if (datosObtenidos && datosObtenidos.length > 0) {
             datosConfiguracion = datosObtenidos;
+            alert("¡Éxito! Se cargaron " + datosConfiguracion.length + " filas del CSV correctamente.");
           } else {
-            throw new Error("El archivo CSV no contiene datos válidos.");
+            throw new Error("El archivo CSV está vacío o sus columnas no están separadas por coma (,) o punto y coma (;).");
           }
           poblarSelectClientes();
         }).catch(function(err) {
-          console.warn("Fallo lectura, usando contingencia", err);
-          document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">Aviso: No se pudo leer configuracion.csv. Cargando lista de contingencia básica.</div>';
-          datosConfiguracion = [
-            { cliente: "HUGHESNET", proyecto: "CONECTIVIDAD RURAL", actividad: "INSTALACION DE ANTENAS", estacion: "SITIO RELEVADO CONTIN" }
-          ];
-          poblarSelectClientes();
+          console.error(err);
+          // Alerta directa en pantalla para saber qué pasa tras bambalinas
+          alert("Error de Conexión / Lectura:\n" + err.message);
+          
+          // Limpiamos la contingencia para que no te confunda si falla
+          selCliente.innerHTML = '<option value="">Error al cargar archivo de SharePoint</option>';
         });
     });
   }
