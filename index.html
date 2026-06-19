@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC</title>
+<title>Inspecciones SITOC - MultiFoto & Marca de Agua</title>
 <script>
-// Carga MSAL dinámicamente con fallback entre 3 CDNs (CORREGIDO)
 (function() {
   var urls = [
     "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
@@ -49,10 +48,7 @@
   select,input[type=text],input[type=date],textarea{width:100%;padding:13px 12px;font-size:16px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:14px;background:#fff;color:var(--texto);font-family:inherit;}
   select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
   textarea{resize:vertical;min-height:80px;}
-  .campo-libre{border:1.5px dashed var(--gris-borde);border-radius:8px;padding:14px;margin-bottom:12px;position:relative;}
-  .campo-libre input{margin-bottom:8px;}
-  .campo-libre input:last-child{margin-bottom:0;}
-  .btn-quitar-campo{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--rojo);font-size:18px;cursor:pointer;line-height:1;padding:4px 8px;}
+  
   .btn-secundario{width:100%;padding:12px;background:var(--gris-claro);border:1.5px dashed var(--azul);color:var(--azul);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
   .btn-primario:disabled{background:#c9c9c9;cursor:not-allowed;}
@@ -62,8 +58,8 @@
   .gps-success {color: var(--verde); background: #e6f4ea;}
   .gps-error {color: var(--rojo); background: #fce8e6;}
 
-  /* Estructura fotográfica interactiva multi-foto */
-  .foto-item-row {border-bottom: 1px solid var(--gris-borde); padding: 16px 0; display: flex; flex-direction: column; gap: 8px;}
+  /* Lista de ítems fotográficos */
+  .foto-item-row {border-bottom: 1px solid var(--gris-borde); padding: 16px 0; display: flex; flex-direction: column; gap: 10px;}
   .foto-item-row:last-child {border-bottom: none;}
   .foto-item-header {display: flex; align-items: center; justify-content: space-between; gap: 12px;}
   .foto-item-info {flex: 1;}
@@ -72,40 +68,32 @@
   .status-pendiente {color: #7c8a94;}
   .status-tomada {color: var(--verde);}
   .status-na {color: #7f8c8d;}
-  .foto-item-action button {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;}
-  .foto-item-action button.btn-revisar {background: #e8731c;}
+  
+  /* Botones de acción por ítem */
+  .foto-item-actions-layout {display: flex; gap: 6px;}
+  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;}
+  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;}
 
-  /* Contenedor de miniaturas agrupadas */
-  .thumbs-container {display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;}
-  .thumb-wrapper {position: relative; width: 60px; height: 60px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde);}
+  /* Galería de fotos acumuladas (Múltiples fotos por ítem) */
+  .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
+  .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
   .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover;}
-  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
-
-  /* Modal de opciones para cada foto */
-  .modal-opciones {position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px;}
-  .modal-content {background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);}
-  .modal-content h3 {margin: 0 0 16px; font-size: 15px; color: var(--azul-osc); text-align: center;}
-  .modal-btn {width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; border: none; text-align: center; display: block;}
-  .modal-btn-foto {background: var(--azul); color: #fff;}
-  .modal-btn-na {background: #eef1f3; color: var(--texto); border: 1.5px solid var(--gris-borde);}
-  .modal-btn-cancelar {background: transparent; color: var(--rojo); margin-bottom: 0; font-weight: 600;}
+  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 0;}
 
   input[type=file]{display:none;}
   #pantallaLogin{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;}
   #pantallaLogin h1{color:var(--azul-osc);font-size:22px;margin-bottom:8px;}
   #pantallaLogin p{color:#5a6b76;margin-bottom:28px;font-size:14px;}
-  #btnLogin{background:var(--azul);color:#fff;border:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:10px;}
+  #btnLogin{background:var(--azul);color:#fff;border:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
   .oculto{display:none !important;}
   #estadoEnvio{position:fixed;inset:0;background:rgba(8,45,68,.94);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px;text-align:center;}
   #estadoEnvio .spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:girar 0.8s linear infinite;margin-bottom:18px;}
   @keyframes girar{to{transform:rotate(360deg);}}
-  #estadoEnvio p{font-size:15px;margin:4px 0;}
   #pantallaExito{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:24px;text-align:center;}
   #pantallaExito .check{width:64px;height:64px;background:var(--verde);border-radius:50%;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
-  #pantallaExito h2{color:var(--azul-osc);margin-bottom:6px;}
-  #pantallaExito p{color:#5a6b76;font-size:14px;margin-bottom:24px;}
   .error-msg{background:#fdecea;border:1px solid #f5c6c1;color:var(--rojo);padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
-  .loading-watermark {font-size: 11px; color: var(--naranja); font-weight: bold; margin-top: 4px;}
+  .loading-watermark {font-size: 12px; color: var(--naranja); font-weight: bold; animation: pulse 1s infinite alternate; margin-top: 4px;}
+  @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
 </style>
 </head>
 <body>
@@ -152,15 +140,10 @@
       <label for="inpNotas">Notas / observaciones generales</label>
       <textarea id="inpNotas" placeholder="Describe lo encontrado, condiciones, novedades..."></textarea>
     </div>
-    <div class="card">
-      <h2>Detalle de campo (opcional)</h2>
-      <div id="camposLibres"></div>
-      <button type="button" class="btn-secundario" id="btnAgregarCampo">+ Agregar pregunta / respuesta</button>
-    </div>
     
     <div class="card">
       <h2 id="txtTituloBloque">BLOQUE: 1 INSTALACION DE ANTENAS</h2>
-      <div class="subtitulo-bloque" id="txtSubtituloBloque">Foto Antena / ODU / RAU</div>
+      <div class="subtitulo-bloque" id="txtSubtituloBloque">Fotos requeridas (Puedes agregar varias fotos por cada ítem)</div>
       
       <div id="listaFotosEstructurada"></div>
     </div>
@@ -171,15 +154,6 @@
 </div>
 
 <input type="file" id="inputCapturaNativa" accept="image/*" multiple>
-
-<div id="modalOpcionesFoto" class="modal-opciones oculto">
-  <div class="modal-content">
-    <h3 id="modalTituloItem">Opciones de imagen</h3>
-    <button class="modal-btn modal-btn-foto" id="modalBtnCamara">&#128247; Capturar / Agregar Fotos</button>
-    <button class="modal-btn modal-btn-na" id="modalBtnNA">&#128683; Marcar como "No Aplica"</button>
-    <button class="modal-btn modal-btn-cancelar" id="modalBtnCancelar">Cancelar</button>
-  </div>
-</div>
 
 <div id="estadoEnvio" class="oculto">
   <div class="spinner"></div>
@@ -221,15 +195,8 @@ var ITEMS_FOTOS_PLANTILLA = [
 
 function iniciarApp() {
   var msalConfig = {
-    auth: {
-      clientId: CONFIG.clientId,
-      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
-      redirectUri: CONFIG.redirectUri
-    },
-    cache: {
-      cacheLocation: "localStorage",
-      storeAuthStateInCookie: true
-    }
+    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: CONFIG.redirectUri },
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
   };
 
   var msalInstance = new msal.PublicClientApplication(msalConfig);
@@ -258,8 +225,7 @@ function iniciarApp() {
       mostrarPantallaLogin();
     }
   }).catch(function(err) {
-    console.error("Error en inicialización de MSAL:", err);
-    mostrarErrorLogin("Error al iniciar sesión: " + err.message);
+    console.error(err);
     mostrarPantallaLogin();
   });
 
@@ -268,16 +234,8 @@ function iniciarApp() {
     document.getElementById("appPrincipal").classList.add("oculto");
   }
 
-  function mostrarErrorLogin(msg) {
-    document.getElementById("loginError").innerHTML =
-      '<div class="error-msg" style="margin-top:16px;max-width:320px;">' + msg + '</div>';
-  }
-
   document.getElementById("btnLogin").addEventListener("click", function() {
-    if (!msalInicializado) {
-      alert("La autenticación con Microsoft se está cargando. Espera un segundo.");
-      return;
-    }
+    if (!msalInicializado) return;
     msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
   });
 
@@ -297,45 +255,33 @@ function iniciarApp() {
     document.getElementById("pantallaLogin").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
     document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
-    var hoy = new Date();
-    document.getElementById("inpFecha").value = hoy.toISOString().split("T")[0];
+    document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
 
     capturarGPSAutomatico();
     inicializarBloqueFotos();
 
     resolverSitioYDrive()
       .then(function() { return cargarConfiguracion(); })
-      .catch(function(e) { mostrarErrorEnvio("No se pudo cargar la configuración: " + e.message); });
+      .catch(function(e) { console.error(e); });
   }
 
   function resolverSitioYDrive() {
     return obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath,
-        { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) {
-          if (!r.ok) throw new Error("No se pudo encontrar el sitio de SharePoint");
-          return r.json();
-        }).then(function(sitio) {
+      return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
+        .then(function(r) { return r.json(); })
+        .then(function(sitio) {
           siteId = sitio.id;
-          return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive",
-            { headers: { Authorization: "Bearer " + token } });
-        }).then(function(r) {
-          if (!r.ok) throw new Error("No se pudo acceder a la biblioteca de documentos");
-          return r.json();
-        }).then(function(drive) {
-          driveId = drive.id;
-        });
+          return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive", { headers: { Authorization: "Bearer " + token } });
+        }).then(function(r) { return r.json(); })
+        .then(function(drive) { driveId = drive.id; });
     });
   }
 
   function cargarConfiguracion() {
     return obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content",
-        { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) {
-          if (!r.ok) throw new Error("No se encontró configuracion.xlsx en el sitio");
-          return r.arrayBuffer();
-        }).then(function(buffer) {
+      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
+        .then(function(r) { return r.arrayBuffer(); })
+        .then(function(buffer) {
           var libro = XLSX.read(buffer, { type: "array" });
           var hoja = libro.Sheets[libro.SheetNames[0]];
           var filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
@@ -368,12 +314,8 @@ function iniciarApp() {
   selCliente.addEventListener("change", function() {
     var c = selCliente.value;
     selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
-    selActividad.innerHTML = '<option value="">Elige un proyecto primero</option>';
-    selEstacion.innerHTML = '<option value="">Elige una actividad primero</option>';
-    selActividad.disabled = true;
-    selEstacion.disabled = true;
+    selActividad.disabled = selEstacion.disabled = true;
     if (!c) { selProyecto.disabled = true; return; }
-    
     var proyectos = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
     selProyecto.innerHTML += proyectos.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join("");
     selProyecto.disabled = false;
@@ -382,10 +324,8 @@ function iniciarApp() {
   selProyecto.addEventListener("change", function() {
     var c = selCliente.value, p = selProyecto.value;
     selActividad.innerHTML = '<option value="">Selecciona una actividad</option>';
-    selEstacion.innerHTML = '<option value="">Elige una actividad primero</option>';
     selEstacion.disabled = true;
     if (!p) { selActividad.disabled = true; return; }
-    
     var actividades = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
     selActividad.innerHTML += actividades.map(function(a) { return '<option value="' + a + '">' + a + '</option>'; }).join("");
     selActividad.disabled = false;
@@ -395,7 +335,6 @@ function iniciarApp() {
     var c = selCliente.value, p = selProyecto.value, a = selActividad.value;
     selEstacion.innerHTML = '<option value="">Selecciona una estación o sitio</option>';
     if (!a) { selEstacion.disabled = true; return; }
-    
     var estaciones = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
     selEstacion.innerHTML += estaciones.map(function(e) { return '<option value="' + e + '">' + e + '</option>'; }).join("");
     selEstacion.disabled = false;
@@ -404,65 +343,39 @@ function iniciarApp() {
   function capturarGPSAutomatico() {
     var bar = document.getElementById("gpsStatusBar");
     var txt = document.getElementById("gpsStatusTexto");
-    
     bar.className = "gps-status-bar gps-searching";
-    txt.textContent = "Buscando coordenadas GPS automáticamente...";
-    ubicacionCapturada = null;
+    ubicacionCaptured = null;
     gpsBuscando = true;
 
     if (!navigator.geolocation) {
       bar.className = "gps-status-bar gps-error";
-      txt.textContent = "El navegador o hardware no soporta GPS.";
-      gpsBuscando = false;
+      txt.textContent = "Hardware GPS no soportado.";
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       function(pos) {
-        var lat = pos.coords.latitude.toFixed(6);
-        var lon = pos.coords.longitude.toFixed(6);
-        ubicacionCapturada = lat + ", " + lon;
+        ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
         bar.className = "gps-status-bar gps-success";
-        txt.textContent = "Coordenadas fijadas automáticamente: " + ubicacionCapturada;
+        txt.textContent = "Coordenadas fijadas: " + ubicacionCapturada;
         gpsBuscando = false;
       },
       function(err) {
         bar.className = "gps-status-bar gps-error";
-        txt.textContent = "Aviso: No se fijó ubicación automática (" + err.message + ")";
+        txt.textContent = "Sin GPS automático (" + err.message + ")";
         gpsBuscando = false;
       },
-      { enableHighAccuracy: true, timeout: 12000 }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   }
 
-  document.getElementById("btnAgregarCampo").addEventListener("click", function() {
-    var contenedor = document.getElementById("camposLibres");
-    var div = document.createElement("div");
-    div.className = "campo-libre";
-    div.innerHTML = '<button type="button" class="btn-quitar-campo">x</button>' +
-      '<input type="text" class="campo-pregunta" placeholder="Pregunta o ítem">' +
-      '<input type="text" class="campo-respuesta" placeholder="Respuesta">';
-    div.querySelector(".btn-quitar-campo").addEventListener("click", function() { div.remove(); });
-    contenedor.appendChild(div);
-  });
-
-  function obtenerCamposLibres() {
-    var resultado = [];
-    document.querySelectorAll(".campo-libre").forEach(function(div) {
-      var p = div.querySelector(".campo-pregunta").value.trim();
-      var r = div.querySelector(".campo-respuesta").value.trim();
-      if (p || r) resultado.push({ pregunta: p, respuesta: r });
-    });
-    return resultado;
-  }
-
-  // ---- MANEJO MULTI-FOTO CON MARCA DE AGUA AUTOMÁTICA ----
+  // ---- NUEVA LOGICA DE ESTRUCTURA ACUMULATIVA MULTIFOTO ----
   function inicializarBloqueFotos() {
     estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(nombreItem) {
       return {
         item: nombreItem,
-        estado: "PENDIENTE", // PENDIENTE, TOMADA o NA
-        fotosList: [] // Lista de objetos { file: Blob/File, previewUrl: string }
+        estado: "PENDIENTE", 
+        fotosList: [] 
       };
     });
     renderizarBloqueFotos();
@@ -490,10 +403,10 @@ function iniciarApp() {
       estado.className = "foto-item-status";
       
       if (foto.estado === "PENDIENTE") {
-        estado.textContent = "❌ Requerido";
+        estado.textContent = "❌ Pendiente";
         estado.className += " status-pendiente";
       } else if (foto.estado === "TOMADA") {
-        estado.textContent = "📸 " + foto.fotosList.length + " Foto(s) Cargada(s)";
+        estado.textContent = "📸 " + foto.fotosList.length + " Foto(s) agregada(s)";
         estado.className += " status-tomada";
       } else if (foto.estado === "NA") {
         estado.textContent = "🚫 No Aplica";
@@ -504,23 +417,33 @@ function iniciarApp() {
       info.appendChild(estado);
       headerRow.appendChild(info);
 
-      var accion = document.createElement("div");
-      accion.className = "foto-item-action";
-      
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = foto.estado === "PENDIENTE" ? "Gestionar" : "Agregar / Modificar";
-      if (foto.estado !== "PENDIENTE") btn.className = "btn-revisar";
-      
-      btn.addEventListener("click", function() {
-        abrirOpcionesItem(idx);
+      // Botones directos en la fila sin modales confusos
+      var actionsLayout = document.createElement("div");
+      actionsLayout.className = "foto-item-actions-layout";
+
+      var btnFoto = document.createElement("button");
+      btnFoto.type = "button";
+      btnFoto.className = "btn-accion-foto";
+      btnFoto.innerHTML = "<span>&#128247;</span> Añadir foto";
+      btnFoto.addEventListener("click", function() {
+        indiceItemSeleccionado = idx;
+        document.getElementById("inputCapturaNativa").click(); // Abre la cámara
       });
 
-      accion.appendChild(btn);
-      headerRow.appendChild(accion);
+      var btnNA = document.createElement("button");
+      btnNA.type = "button";
+      btnNA.className = "btn-accion-na";
+      btnNA.textContent = "N/A";
+      btnNA.addEventListener("click", function() {
+        marcarComoNoAplica(idx);
+      });
+
+      actionsLayout.appendChild(btnFoto);
+      actionsLayout.appendChild(btnNA);
+      headerRow.appendChild(actionsLayout);
       row.appendChild(headerRow);
 
-      // Si tiene fotos en su lista, renderiza las miniaturas abajo del renglón
+      // Render de miniaturas acumuladas abajo del renglón si existen
       if (foto.estado === "TOMADA" && foto.fotosList.length > 0) {
         var thumbsCont = document.createElement("div");
         thumbsCont.className = "thumbs-container";
@@ -536,9 +459,8 @@ function iniciarApp() {
           var btnDel = document.createElement("button");
           btnDel.className = "btn-borrar-foto";
           btnDel.type = "button";
-          btnDel.textContent = "x";
-          btnDel.addEventListener("click", function(e) {
-            e.stopPropagation();
+          btnDel.textContent = "×";
+          btnDel.addEventListener("click", function() {
             eliminarFotoEspecifica(idx, fIdx);
           });
 
@@ -551,12 +473,21 @@ function iniciarApp() {
       if (procesandoMarcasDeAgua > 0 && indiceItemSeleccionado === idx) {
         var loadingTxt = document.createElement("div");
         loadingTxt.className = "loading-watermark";
-        loadingTxt.textContent = "Procesando y quemando datos en imagen...";
+        loadingTxt.textContent = "Quemando datos en la imagen actual...";
         row.appendChild(loadingTxt);
       }
 
       contenedor.appendChild(row);
     });
+  }
+
+  function marcarComoNoAplica(idx) {
+    estructuraFotos[idx].fotosList.forEach(function(fObj) {
+      if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl);
+    });
+    estructuraFotos[idx].estado = "NA";
+    estructuraFotos[idx].fotosList = [];
+    renderizarBloqueFotos();
   }
 
   function eliminarFotoEspecifica(itemIdx, fotoIdx) {
@@ -565,57 +496,22 @@ function iniciarApp() {
       URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl);
     }
     item.fotosList.splice(fotoIdx, 1);
-    
-    if (item.fotosList.length === 0) {
-      item.estado = "PENDIENTE";
-    }
+    if (item.fotosList.length === 0) item.estado = "PENDIENTE";
     renderizarBloqueFotos();
   }
 
-  var modal = document.getElementById("modalOpcionesFoto");
-  
-  function abrirOpcionesItem(idx) {
-    indiceItemSeleccionado = idx;
-    document.getElementById("modalTituloItem").textContent = estructuraFotos[idx].item;
-    modal.classList.remove("oculto");
-  }
-
-  document.getElementById("modalBtnCancelar").addEventListener("click", function() {
-    modal.classList.add("oculto");
-    indiceItemSeleccionado = null;
-  });
-
-  document.getElementById("modalBtnNA").addEventListener("click", function() {
-    if (indiceItemSeleccionado !== null) {
-      // Limpiar fotos previas si decide marcar NA
-      estructuraFotos[indiceItemSeleccionado].fotosList.forEach(function(fObj) {
-        if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl);
-      });
-      estructuraFotos[indiceItemSeleccionado].estado = "NA";
-      estructuraFotos[indiceItemSeleccionado].fotosList = [];
-      
-      modal.classList.add("oculto");
-      renderizarBloqueFotos();
-    }
-  });
-
-  document.getElementById("modalBtnCamara").addEventListener("click", function() {
-    document.getElementById("inputCapturaNativa").click();
-  });
-
+  // Captura el disparo de archivos de la cámara nativa y los acumula uno a uno
   document.getElementById("inputCapturaNativa").addEventListener("change", function(e) {
     if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
       var files = Array.from(e.target.files);
-      modal.classList.add("oculto");
-      
-      // Si el ítem estaba en NA o PENDIENTE, lo cambiamos a TOMADA para empezar a acumular
-      if (estructuraFotos[indiceItemSeleccionado].estado !== "TOMADA") {
-        estructuraFotos[indiceItemSeleccionado].estado = "TOMADA";
+      var itemActual = estructuraFotos[indiceItemSeleccionado];
+
+      if (itemActual.estado !== "TOMADA") {
+        itemActual.estado = "TOMADA";
       }
 
       var estacionText = selEstacion.value || "No seleccionada";
       var coordsText = ubicacionCapturada || "Buscando o sin GPS";
-      
       var hoy = new Date();
       var fechaHoraText = hoy.toLocaleDateString() + " " + hoy.toLocaleTimeString();
 
@@ -625,7 +521,7 @@ function iniciarApp() {
 
         estamparMarcaDeAgua(file, coordsText, estacionText, fechaHoraText, function(blobEstampado) {
           if (blobEstampado) {
-            estructuraFotos[indiceItemSeleccionado].fotosList.push({
+            itemActual.fotosList.push({
               file: blobEstampado,
               previewUrl: URL.createObjectURL(blobEstampado)
             });
@@ -635,10 +531,10 @@ function iniciarApp() {
         });
       });
     }
-    e.target.value = ""; 
+    e.target.value = ""; // Limpia el input para permitir re-capturas consecutivas en iOS/Android
   });
 
-  // ---- FUNCIÓN PROCESADORA DE CANVAS (QUEMAR DATOS) ----
+  // ---- PROCESADOR DE CANVAS CORREGIDO PARA FORZAR EL "QUEMADO" ----
   function estamparMarcaDeAgua(file, coordenadas, estacion, fechaHora, callback) {
     var lector = new FileReader();
     lector.readAsDataURL(file);
@@ -649,47 +545,46 @@ function iniciarApp() {
         var canvas = document.createElement("canvas");
         var ctx = canvas.getContext("2d");
 
-        // Mantener las dimensiones reales de la cámara
+        // Dimensiones exactas de la captura de cámara nativa
         canvas.width = img.width;
         canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        // Ajustar dinámicamente el tamaño de la letra y el cintillo según la resolución
-        var altoCintillo = Math.round(canvas.height * 0.08); 
-        if (altoCintillo < 50) altoCintillo = 50; 
         
-        var tamanoFuente = Math.round(altoCintillo * 0.25);
-        if (tamanoFuente < 12) tamanoFuente = 12;
+        // Dibujar imagen base
+        ctx.drawImage(img, 0, 0, img.width, img.height);
 
-        // Dibujar franja oscura semitransparente abajo de la foto
-        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        // Calcular proporciones dinámicas según la resolución de la foto
+        var altoCintillo = Math.round(canvas.height * 0.09); 
+        if (altoCintillo < 70) altoCintillo = 70; 
+        
+        var tamanoFuente = Math.round(altoCintillo * 0.24);
+        if (tamanoFuente < 15) tamanoFuente = 15;
+
+        // 1. Dibujar fondo oscuro semitransparente abajo
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
         ctx.fillRect(0, canvas.height - altoCintillo, canvas.width, altoCintillo);
 
-        // Estilo del texto quemado
-        ctx.fillStyle = "#ffffff";
+        // 2. Propiedades de texto
+        ctx.fillStyle = "#FFFFFF"; 
         ctx.font = "bold " + tamanoFuente + "px Arial, sans-serif";
         ctx.textBaseline = "middle";
 
-        var margenX = Math.round(canvas.width * 0.03);
-        var linea1Y = canvas.height - (altoCintillo * 0.7);
-        var linea2Y = canvas.height - (altoCintillo * 0.3);
+        var margenX = Math.round(canvas.width * 0.04);
+        var linea1Y = canvas.height - (altoCintillo * 0.68);
+        var linea2Y = canvas.height - (altoCintillo * 0.32);
 
-        // Escribir los datos solicitados en dos líneas claras
+        // 3. Escribir datos reales "quemados" encima de la imagen
         ctx.fillText("ESTACIÓN: " + estacion.toUpperCase(), margenX, linea1Y);
         ctx.fillText("GPS: " + coordenadas + "  |  " + fechaHora, margenX, linea2Y);
 
-        // Convertir el canvas de nuevo a archivo comprimido tipo JPEG
+        // Convertir canvas a un archivo Blob físico compilado en formato JPEG
         canvas.toBlob(function(blob) {
           callback(blob);
-        }, "image/jpeg", 0.85);
+        }, "image/jpeg", 0.90);
       };
     };
   }
 
   function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
-  function mostrarErrorEnvio(msg) {
-    document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">' + msg + '</div>';
-  }
 
   function validar() {
     if (!selCliente.value) return "Selecciona un cliente.";
@@ -698,11 +593,11 @@ function iniciarApp() {
     if (!selEstacion.value) return "Selecciona una estación o sitio de trabajo.";
     if (!document.getElementById("inpTecnico").value.trim()) return "Escribe el nombre del técnico.";
     if (!document.getElementById("inpFecha").value) return "Selecciona la fecha.";
-    if (procesandoMarcasDeAgua > 0) return "Por favor espera a que terminen de procesarse las marcas de agua en las fotos.";
+    if (procesandoMarcasDeAgua > 0) return "Espera a que terminen de procesarse las marcas de agua.";
     
     for (var i = 0; i < estructuraFotos.length; i++) {
       if (estructuraFotos[i].estado === "PENDIENTE") {
-        return "Falta responder la sección de fotos: '" + estructuraFotos[i].item + "' requiere que agregues fotos o selecciones No Aplica.";
+        return "El ítem '" + estructuraFotos[i].item + "' requiere fotos o marcar como N/A.";
       }
     }
     return null;
@@ -711,7 +606,7 @@ function iniciarApp() {
   document.getElementById("btnEnviar").addEventListener("click", function() {
     document.getElementById("errorEnvioWrap").innerHTML = "";
     var err = validar();
-    if (err) { mostrarErrorEnvio(err); return; }
+    if (err) { document.getElementById("errorEnvioWrap").innerHTML = '<div class="error-msg">' + err + '</div>'; return; }
 
     var overlay = document.getElementById("estadoEnvio");
     var overlayTexto = document.getElementById("estadoEnvioTexto");
@@ -724,35 +619,24 @@ function iniciarApp() {
     var tecnico = document.getElementById("inpTecnico").value.trim();
     var fecha = document.getElementById("inpFecha").value;
     var notas = document.getElementById("inpNotas").value.trim();
-    var camposLibres = obtenerCamposLibres();
     var hora = new Date().toTimeString().split(" ")[0].replace(/:/g, "-");
     var nombreCarpeta = limpiarNombre(actividad + "_" + fecha + "_" + hora + "_" + tecnico);
     var rutaBase = CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(cliente) + "/" + limpiarNombre(proyecto) + "/" + nombreCarpeta;
 
-    var promesaGPS = Promise.resolve();
-    if (gpsBuscando && !ubicacionCapturada) {
-      overlayTexto.textContent = "Esperando estabilización del GPS automático...";
-      promesaGPS = new Promise(function(resolve) {
-        setTimeout(resolve, 3000);
-      });
-    }
+    obtenerToken().then(function(token) {
+      overlayTexto.textContent = "Generando excel de reporte...";
+      var blob = construirExcel({ cliente, proyecto, actividad, estacion, tecnico, fecha, notas });
 
-    promesaGPS.then(function() {
-      return obtenerToken();
-    }).then(function(token) {
-      overlayTexto.textContent = "Generando archivo de datos...";
-      var blob = construirExcel({ cliente, proyecto, actividad, estacion, tecnico, fecha, notas, camposLibres });
-
-      overlayTexto.textContent = "Subiendo datos generales...";
+      overlayTexto.textContent = "Subiendo archivo index maestro...";
       return subirArchivo(token, rutaBase + "/datos.xlsx", blob).then(function() {
         
-        // Desglosar la lista de arreglos en un arreglo plano de subidas secuenciales
+        // Desglosar la lista acumulada de múltiples fotos por ítem a una lista plana de subidas
         var listaPlanaSubidas = [];
         estructuraFotos.forEach(function(item) {
           if (item.estado === "TOMADA") {
             item.fotosList.forEach(function(fObj, index) {
-              var indiceTexto = item.fotosList.length > 1 ? "_" + (index + 1) : "";
-              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + indiceTexto + ".jpg";
+              var enumerador = "_" + (index + 1);
+              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + enumerador + ".jpg";
               listaPlanaSubidas.push({
                 ruta: rutaBase + "/fotos/" + nombreArchivo,
                 file: fObj.file
@@ -764,7 +648,7 @@ function iniciarApp() {
         var i = 0;
         function subirSiguiente() {
           if (i >= listaPlanaSubidas.length) return Promise.resolve();
-          overlayTexto.textContent = "Subiendo foto " + (i+1) + " de " + listaPlanaSubidas.length + "...";
+          overlayTexto.textContent = "Subiendo archivo fotográfico estampada " + (i+1) + " de " + listaPlanaSubidas.length + "...";
           return subirArchivo(token, listaPlanaSubidas[i].ruta, listaPlanaSubidas[i].file).then(function() {
             i++;
             return subirSiguiente();
@@ -772,24 +656,22 @@ function iniciarApp() {
         }
         return subirSiguiente();
       }).then(function() {
-        overlayTexto.textContent = "Generando enlace de evidencias...";
-        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaBase,
-          { headers: { Authorization: "Bearer " + token } })
+        overlayTexto.textContent = "Obteniendo vínculo compartido...";
+        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaBase, { headers: { Authorization: "Bearer " + token } })
           .then(function(r) { return r.ok ? r.json() : {}; })
           .then(function(j) { return j.webUrl || ""; });
       }).then(function(linkCarpeta) {
-        overlayTexto.textContent = "Actualizando registro maestro...";
-        return agregarFilaMaestro(token, { fecha, tecnico, cliente, proyecto, actividad, estacion,
-          ubicacion: ubicacionCapturada || "Sin coordenadas", linkCarpeta });
+        overlayTexto.textContent = "Consolidando registro maestro general...";
+        return agregarFilaMaestro(token, { fecha, tecnico, cliente, proyecto, actividad, estacion, ubicacion: ubicacionCapturada || "Sin coordenadas", linkCarpeta });
       }).then(function() {
         overlay.classList.add("oculto");
         document.getElementById("appPrincipal").classList.add("oculto");
         document.getElementById("pantallaExito").classList.remove("oculto");
-        document.getElementById("exitoDetalle").textContent = "Los datos generales y todas las fotos estampadas se guardaron correctamente.";
+        document.getElementById("exitoDetalle").textContent = "Se guardaron con éxito los datos y todas las imágenes con sus marcas de agua quemadas.";
       });
     }).catch(function(e) {
       overlay.classList.add("oculto");
-      mostrarErrorEnvio("Error crítico al enviar: " + e.message + ". Intenta de nuevo.");
+      alert("Error al enviar inspección: " + e.message);
     });
   });
 
@@ -802,25 +684,18 @@ function iniciarApp() {
       ["Estación o sitio de trabajo",d.estacion],
       ["Técnico",d.tecnico],
       ["Fecha",d.fecha],
-      ["Ubicación GPS", ubicacionCapturada || "No capturada / Tiempo de espera agotado"],
+      ["Ubicación GPS", ubicacionCapturada || "No registrada"],
       ["Notas",d.notas||""]
     ];
-    
     var libro = XLSX.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasG), "Datos generales");
     
-    var filasFotosReporte = [["Ítem Fotográfico Obligatorio", "Estatus en Campo", "Cantidad de fotos"]];
+    var filasFotosReporte = [["Ítem Fotográfico Obligatorio", "Estatus en Campo", "Cantidad de fotos registradas"]];
     estructuraFotos.forEach(function(f) {
-      var cant = f.estado === "TOMADA" ? f.fotosList.length : 0;
-      filasFotosReporte.push([f.item, f.estado === "TOMADA" ? "Cargada" : "No Aplica", cant]);
+      filasFotosReporte.push([f.item, f.estado === "TOMADA" ? "Cargada" : "No Aplica", f.fotosList.length]);
     });
-    XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasFotosReporte), "Estatus Fotos Bloque 1");
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasFotosReporte), "Estatus Fotos");
 
-    if (d.camposLibres.length > 0) {
-      var filasD = [["Pregunta","Respuesta"]];
-      d.camposLibres.forEach(function(c) { filasD.push([c.pregunta, c.respuesta]); });
-      XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet(filasD), "Detalle Dinámico");
-    }
     var buf = XLSX.write(libro, { type: "array", bookType: "xlsx" });
     return new Blob([buf], { type: "application/octet-stream" });
   }
@@ -831,7 +706,7 @@ function iniciarApp() {
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" },
       body: contenido
     }).then(function(r) {
-      if (!r.ok) return r.text().then(function(t) { throw new Error("Error subiendo " + ruta + ": " + t); });
+      if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
       return r.json();
     });
   }
@@ -839,68 +714,41 @@ function iniciarApp() {
   function agregarFilaMaestro(token, fila) {
     var url = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoMaestro + ":/content";
     return fetch(url, { headers: { Authorization: "Bearer " + token } })
-      .then(function(r) {
-        if (!r.ok) throw new Error("No se pudo leer maestro.xlsx");
-        return r.arrayBuffer();
-      }).then(function(buf) {
+      .then(function(r) { if (!r.ok) throw new Error("Error maestro.xlsx"); return r.arrayBuffer(); })
+      .then(function(buf) {
         var libro = XLSX.read(buf, { type: "array" });
         var nombre = libro.SheetNames[0];
         var filas = XLSX.utils.sheet_to_json(libro.Sheets[nombre], { defval: "" });
-        filas.push({ Fecha: fila.fecha, Tecnico: fila.tecnico, Cliente: fila.cliente,
-          Proyecto: fila.proyecto, Actividad: fila.actividad, Estacion: fila.estacion,
-          Ubicacion: fila.ubicacion, Link_Carpeta: fila.linkCarpeta });
-        libro.Sheets[nombre] = XLSX.utils.json_to_sheet(filas,
-          { header: ["Fecha","Tecnico","Cliente","Proyecto","Actividad","Estacion","Ubicacion","Link_Carpeta"] });
+        filas.push({ Fecha: fila.fecha, Tecnico: fila.tecnico, Cliente: fila.cliente, Proyecto: fila.proyecto, Actividad: fila.actividad, Estacion: fila.estacion, Ubicacion: fila.ubicacion, Link_Carpeta: fila.linkCarpeta });
+        libro.Sheets[nombre] = XLSX.utils.json_to_sheet(filas, { header: ["Fecha","Tecnico","Cliente","Proyecto","Actividad","Estacion","Ubicacion","Link_Carpeta"] });
         var bufNuevo = XLSX.write(libro, { type: "array", bookType: "xlsx" });
         return fetch(url, {
           method: "PUT",
           headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" },
           body: new Blob([bufNuevo], { type: "application/octet-stream" })
         });
-      }).then(function(r) {
-        if (!r.ok) throw new Error("No se pudo actualizar maestro.xlsx");
-      });
+      }).then(function(r) { if (!r.ok) throw new Error("Error guardando actualización maestro"); });
   }
 
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() {
     estructuraFotos.forEach(function(item) {
-      item.fotosList.forEach(function(fObj) {
-        if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl);
-      });
+      item.fotosList.forEach(function(fObj) { if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl); });
     });
-
-    document.getElementById("camposLibres").innerHTML = "";
     document.getElementById("inpNotas").value = "";
-    
     capturarGPSAutomatico();
     inicializarBloqueFotos();
-
     selCliente.value = "";
-    selProyecto.innerHTML = '<option value="">Elige un cliente primero</option>';
-    selProyecto.disabled = true;
-    selActividad.innerHTML = '<option value="">Elige un proyecto primero</option>';
-    selActividad.disabled = true;
-    selEstacion.innerHTML = '<option value="">Elige una actividad primero</option>';
-    selEstacion.disabled = true;
-    
-    document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
+    selProyecto.innerHTML = selActividad.innerHTML = selEstacion.innerHTML = '<option value="">Elige el nivel anterior primero</option>';
+    selProyecto.disabled = selActividad.disabled = selEstacion.disabled = true;
     document.getElementById("pantallaExito").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
   });
 }
 
 function esperarMSAL(intentos) {
-  if (typeof msal !== "undefined") {
-    iniciarApp();
-  } else if (intentos > 0) {
-    setTimeout(function() { esperarMSAL(intentos - 1); }, 400);
-  } else {
-    document.getElementById("loginError").innerHTML =
-      '<div class="error-msg" style="margin-top:16px;">No se pudo cargar la librería de Microsoft. Verifica tu conexión y recarga la página.</div>';
-    document.getElementById("pantallaLogin").classList.remove("oculto");
-  }
+  if (typeof msal !== "undefined") { iniciarApp(); }
+  else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
 }
-
 window.addEventListener("load", function() { esperarMSAL(25); });
 </script>
 </body>
