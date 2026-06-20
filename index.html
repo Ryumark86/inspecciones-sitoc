@@ -496,13 +496,34 @@ function iniciarApp() {
       var img = new Image(); img.src = ev.target.result;
       img.onload = function() {
         var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
-        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0, img.width, img.height);
-        var ac = Math.max(70, Math.round(canvas.height * 0.09)), tf = Math.max(15, Math.round(ac * 0.24));
+        
+        // === NUEVA MEJORA: ESCALADO DINÁMICO A RESOLUCIÓN FULL HD (1080p) ===
+        var MAX_ANCHO_ALTO = 1920; // Dimensión FHD estandarizada
+        var anchoOriginal = img.width; var altoOriginal = img.height;
+        var nuevoAncho = anchoOriginal; var nuevoAlto = altoOriginal;
+
+        if (anchoOriginal > MAX_ANCHO_ALTO || altoOriginal > MAX_ANCHO_ALTO) {
+          if (anchoOriginal > altoOriginal) {
+            nuevoAncho = MAX_ANCHO_ALTO;
+            nuevoAlto = Math.round((altoOriginal * MAX_ANCHO_ALTO) / anchoOriginal);
+          } else {
+            nuevoAlto = MAX_ANCHO_ALTO;
+            nuevoAncho = Math.round((anchoOriginal * MAX_ANCHO_ALTO) / altoOriginal);
+          }
+        }
+
+        canvas.width = nuevoAncho; canvas.height = nuevoAlto; 
+        ctx.drawImage(img, 0, 0, nuevoAncho, nuevoAlto);
+        
+        // Proporciones estéticas adaptadas para el banner inferior de datos
+        var ac = Math.max(65, Math.round(canvas.height * 0.08)), tf = Math.max(14, Math.round(ac * 0.25));
         ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - ac, canvas.width, ac);
         ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
         ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
         ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
-        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.90);
+        
+        // Guardar con compresión de calidad JPG balanceada al 85%
+        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.85);
       };
     };
   }
