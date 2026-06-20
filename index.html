@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - MultiFoto RealTime</title>
+<title>Inspecciones SITOC - Panel Unificado (Campo/Supervisión)</title>
 <script>
 (function() {
   var urls = [
@@ -32,17 +32,22 @@
     --texto:#1c2b36;
     --verde:#2e7d4f;
     --rojo:#c0392b;
+    --indigo:#3f51b5;
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--gris-claro);color:var(--texto);}
   header{background:var(--azul);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
   header h1{font-size:18px;margin:0;font-weight:700;}
   header .sub{font-size:12px;opacity:.8;margin-top:2px;}
-  #btnLogout{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;}
-  main{max-width:560px;margin:0 auto;padding:20px 16px 80px;}
+  .header-actions{display:flex;gap:8px;}
+  #btnLogout, .btn-nav{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;}
+  .btn-nav-active{background:var(--naranja);border-color:var(--naranja);}
+  
+  main{max-width:680px;margin:0 auto;padding:20px 16px 80px;}
   .card{background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid var(--gris-borde);}
   .card h2{font-size:15px;margin:0 0 4px;color:var(--azul-osc);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
   .card .subtitulo-bloque{font-size:13px;color:#7c8a94;margin-bottom:14px;font-weight:500;}
+  
   label{display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--texto);}
   select,input[type=text],input[type=date],textarea{width:100%;padding:13px 12px;font-size:16px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:14px;background:#fff;color:var(--texto);font-family:inherit;}
   select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
@@ -51,13 +56,11 @@
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
   .btn-primario:disabled{background:#c9c9c9;cursor:not-allowed;}
   
-  .btn-bloque{width:100%;padding:12px;background:var(--azul);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:14px;}
-  .btn-bloque:disabled{background:#7c8a94;opacity:0.6;}
+  .btn-bloque{width:100%;padding:12px;background:var(--azul);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}
+  .btn-secundario-bloque{width:100%;padding:10px;background:#fff;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;}
 
-  .gps-status-bar {font-size: 13px; padding: 10px; border-radius: 6px; background: #eef1f3; margin-bottom: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px;}
-  .gps-searching {color: var(--naranja);}
+  .gps-status-bar {font-size: 13px; padding: 10px; border-radius: 6px; background: #eef1f3; margin-bottom: 14px; font-weight: 500;}
   .gps-success {color: var(--verde); background: #e6f4ea;}
-  .gps-error {color: var(--rojo); background: #fce8e6;}
 
   .foto-item-row {border-bottom: 1px solid var(--gris-borde); padding: 16px 0; display: flex; flex-direction: column; gap: 10px;}
   .foto-item-row:last-child {border-bottom: none;}
@@ -71,56 +74,63 @@
   .status-subida {color: #2980b9;}
   
   .foto-item-actions-layout {display: flex; gap: 6px;}
-  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;}
-  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;}
+  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
+  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px;}
 
   .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
-  .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
+  .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde);}
   .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover;}
-  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 0;}
+  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold;}
+
+  /* ESTILOS PANEL SUPERVISOR */
+  .grid-supervisor-fotos {display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 14px;}
+  .card-foto-superv {background: #fafafa; border: 1px solid var(--gris-borde); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;}
+  .card-foto-superv img {width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid var(--gris-borde); cursor: pointer;}
+  .card-foto-superv .meta {font-size: 12px; font-weight: 600; color: var(--texto); word-break: break-all; min-height: 32px;}
+  .btn-rechazar-superv {width: 100%; padding: 8px; background: var(--rojo); color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;}
 
   input[type=file]{display:none;}
   #pantallaLogin{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;}
   #pantallaLogin h1{color:var(--azul-osc);font-size:22px;margin-bottom:8px;}
-  #pantallaLogin p{color:#5a6b76;margin-bottom:28px;font-size:14px;}
   #btnLogin{background:var(--azul);color:#fff;border:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
   .oculto{display:none !important;}
   #estadoEnvio{position:fixed;inset:0;background:rgba(8,45,68,.94);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px;text-align:center;}
-  #estadoEnvio .spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:girar 0.8s linear infinite;margin-bottom:18px;}
+  .spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:girar 0.8s linear infinite;margin-bottom:18px;}
   @keyframes girar{to{transform:rotate(360deg);}}
-  #pantallaExito{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:24px;text-align:center;}
-  #pantallaExito .check{width:64px;height:64px;background:var(--verde);border-radius:50%;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
-  .error-msg{background:#fdecea;border:1px solid #f5c6c1;color:var(--rojo);padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+  #pantallaExito{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:24px;}
+  .check{width:64px;height:64px;background:var(--verde);border-radius:50%;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
 </style>
 </head>
 <body>
 
 <div id="pantallaLogin">
   <h1>Inspecciones SITOC</h1>
-  <p>Inicia sesión con tu cuenta corporativa para registrar una inspección.</p>
+  <p>Inicia sesión con tu cuenta corporativa.</p>
   <button id="btnLogin">&#128274; Iniciar sesión con Microsoft</button>
 </div>
 
 <div id="appPrincipal" class="oculto">
   <header>
     <div>
-      <h1>Nueva inspección</h1>
+      <h1 id="tituloHeader">Nueva Inspección (Campo)</h1>
       <div class="sub" id="nombreUsuario"></div>
     </div>
-    <button id="btnLogout">Salir</button>
+    <div class="header-actions">
+      <button class="btn-nav btn-nav-active" id="navCampo">Formulario</button>
+      <button class="btn-nav" id="navSupervisor">Escritorio/Supervisor</button>
+      <button id="btnLogout">Salir</button>
+    </div>
   </header>
-  <main>
+  
+  <main id="vistaCampo">
     <div class="card">
       <h2>Ubicación de trabajo</h2>
       <label for="selCliente">Cliente</label>
       <select id="selCliente"><option value="">Descargando listas desde SharePoint...</option></select>
-      
       <label for="selProyecto">Proyecto</label>
       <select id="selProyecto" disabled><option value="">Elige un cliente primero</option></select>
-      
       <label for="selActividad">Actividad</label>
       <select id="selActividad" disabled><option value="">Elige un proyecto primero</option></select>
-      
       <label for="selEstacion">Estación o sitio de trabajo</label>
       <select id="selEstacion" disabled><option value="">Elige una actividad primero</option></select>
     </div>
@@ -130,24 +140,40 @@
       <input type="text" id="inpTecnico" placeholder="Tu nombre completo">
       <label for="inpFecha">Fecha</label>
       <input type="date" id="inpFecha">
-      
-      <div id="gpsStatusBar" class="gps-status-bar gps-searching">&#128205; <span id="gpsStatusTexto">Buscando coordenadas GPS automáticamente...</span></div>
-      
+      <div id="gpsStatusBar" class="gps-status-bar">&#128205; <span id="gpsStatusTexto">Buscando coordenadas GPS automáticamente...</span></div>
       <label for="inpNotas">Notas / observaciones generales</label>
-      <textarea id="inpNotas" placeholder="Describe lo encontrado, condiciones, novedades..."></textarea>
+      <textarea id="inpNotas" placeholder="Describe lo encontrado..."></textarea>
     </div>
     
     <div class="card">
-      <h2>BLOQUE 1: INSTALACION DE ANTENAS</h2>
-      <div class="subtitulo-bloque">Toma las fotos de este bloque y súbelas para revisión inmediata de escritorio.</div>
-      
+      <h2>BLOQUE 1: INSTALACIÓN DE ANTENAS</h2>
+      <div class="subtitulo-bloque">Guarda el bloque para que el supervisor valide desde el escritorio.</div>
       <div id="listaFotosEstructurada"></div>
       
       <button class="btn-bloque" id="btnGuardarBloque1">💾 Subir / Guardar Fotos de este Bloque</button>
+      <button class="btn-secundario-bloque" id="btnSincronizarCambiosEscritorio">🔄 Verificar fotos aprobadas en Escritorio</button>
     </div>
     
-    <div id="errorEnvioWrap"></div>
     <button class="btn-primario" id="btnEnviar">Enviar inspección definitiva</button>
+  </main>
+
+  <main id="vistaSupervisor" class="oculto">
+    <div class="card">
+      <h2>Panel de Control y Monitoreo en Vivo</h2>
+      <div class="subtitulo-bloque">Visualiza y aprueba el material que los técnicos están capturando en tiempo real.</div>
+      
+      <button class="btn-bloque" id="btnCargarCarpetasActivas" style="margin-bottom:14px; background:var(--indigo);">🔄 Buscar Inspecciones Activas en SharePoint</button>
+      
+      <label for="selCarpetaMonitoreo">Seleccionar Inspección en Campo</label>
+      <select id="selCarpetaMonitoreo"><option value="">Haga clic en el botón de arriba para buscar...</option></select>
+    </div>
+
+    <div class="card oculto" id="cardGaleriaSupervisor">
+      <h2>Fotos Recibidas en este Sitio</h2>
+      <div class="subtitulo-bloque">Si una foto no cumple los criterios, presione "Rechazar" para eliminarla y notificar al celular del técnico.</div>
+      
+      <div id="galeriaFotosSupervisor" class="grid-supervisor-fotos"></div>
+    </div>
   </main>
 </div>
 
@@ -155,14 +181,14 @@
 
 <div id="estadoEnvio" class="oculto">
   <div class="spinner"></div>
-  <p id="estadoEnvioTexto">Preparando envío...</p>
+  <p id="estadoEnvioTexto">Procesando...</p>
 </div>
 
 <div id="pantallaExito" class="oculto">
   <div class="check">&#10003;</div>
-  <h2>Inspección enviada</h2>
+  <h2>Operación Completada</h2>
   <p id="exitoDetalle"></p>
-  <button class="btn-primario" id="btnNuevaInspeccion" style="max-width:280px;">Registrar otra inspección</button>
+  <button class="btn-primario" id="btnNuevaInspeccion" style="max-width:280px;">Volver</button>
 </div>
 
 <script>
@@ -196,8 +222,7 @@ function procesarCSVNativo(textoPlano) {
     var lineas = textoPlano.split(/\r?\n/);
     var filasMapeadas = [];
     for (var i = 0; i < lineas.length; i++) {
-      var linea = lineas[i].trim();
-      if (!linea) continue;
+      var linea = lineas[i].trim(); if (!linea) continue;
       var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
       var cli = celdas[0] ? celdas[0].trim() : "";
       var pro = celdas[1] ? celdas[1].trim() : "";
@@ -205,16 +230,11 @@ function procesarCSVNativo(textoPlano) {
       var est = celdas[3] ? celdas[3].trim() : "";
       if (i === 0 && cli.toLowerCase().includes("client")) continue;
       if (cli && pro) {
-        filasMapeadas.push({
-          cliente: cli.toUpperCase(),
-          proyecto: pro.toUpperCase(),
-          actividad: act ? act.toUpperCase() : "INSTALACION",
-          estacion: est ? est.toUpperCase() : "SITIO GENERAL"
-        });
+        filasMapeadas.push({ cliente: cli.toUpperCase(), proyecto: pro.toUpperCase(), actividad: act ? act.toUpperCase() : "INSTALACION", estacion: est ? est.toUpperCase() : "SITIO GENERAL" });
       }
     }
-    return filasMapeadas.length > 0 ? filasMapeadas : null;
-  } catch(e) { return null; }
+    return filasMapeadas;
+  } catch(e) { return []; }
 }
 
 function iniciarApp() {
@@ -225,17 +245,10 @@ function iniciarApp() {
 
   var msalInstance = new msal.PublicClientApplication(msalConfig);
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
-  var cuentaActual = null;
-  var siteId = null;
-  var driveId = null;
-  var datosConfiguracion = [];
-  var msalInicializado = false;
-
-  var estructuraFotos = [];
-  var ubicacionCapturada = null;
-  var gpsBuscando = false;
-  var indiceItemSeleccionado = null;
-  var procesandoMarcasDeAgua = 0;
+  var cuentaActual = null; var siteId = null; var driveId = null;
+  var datosConfiguracion = []; var msalInicializado = false;
+  var estructuraFotos = []; var ubicacionCapturada = null;
+  var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
   msalInstance.initialize().then(function() {
     return msalInstance.handleRedirectPromise();
@@ -243,20 +256,30 @@ function iniciarApp() {
     msalInicializado = true;
     var cuentas = msalInstance.getAllAccounts();
     if (cuentas.length > 0) { cuentaActual = cuentas[0]; mostrarAppPrincipal(); } 
-    else { mostrarPantallaLogin(); }
-  }).catch(function(err) { mostrarPantallaLogin(); });
-
-  function mostrarPantallaLogin() {
-    document.getElementById("pantallaLogin").classList.remove("oculto");
-    document.getElementById("appPrincipal").classList.add("oculto");
-  }
+    else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
+  }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
 
   document.getElementById("btnLogin").addEventListener("click", function() {
-    if (!msalInicializado) return;
-    msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
+    if (msalInicializado) msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
+  });
+  document.getElementById("btnLogout").addEventListener("click", function() { msalInstance.logoutRedirect(); });
+
+  // CONMUTACIÓN DE VISTAS (CAMPO VS SUPERVISOR)
+  document.getElementById("navCampo").addEventListener("click", function() {
+    document.getElementById("navCampo").classList.add("btn-nav-active");
+    document.getElementById("navSupervisor").classList.remove("btn-nav-active");
+    document.getElementById("vistaCampo").classList.remove("oculto");
+    document.getElementById("vistaSupervisor").classList.add("oculto");
+    document.getElementById("tituloHeader").textContent = "Nueva Inspección (Campo)";
   });
 
-  document.getElementById("btnLogout").addEventListener("click", function() { msalInstance.logoutRedirect(); });
+  document.getElementById("navSupervisor").addEventListener("click", function() {
+    document.getElementById("navSupervisor").classList.add("btn-nav-active");
+    document.getElementById("navCampo").classList.remove("btn-nav-active");
+    document.getElementById("vistaSupervisor").classList.remove("oculto");
+    document.getElementById("vistaCampo").classList.add("oculto");
+    document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
+  });
 
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
@@ -270,11 +293,19 @@ function iniciarApp() {
     document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
     document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
 
-    capturarGPSAutomatico();
-    inicializarBloqueFotos();
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
+        document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
+        document.getElementById("gpsStatusBar").classList.add("gps-success");
+      }, null, { enableHighAccuracy: true });
+    }
+
+    estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
+    renderizarBloqueFotos();
 
     resolverSitioYDrive()
-      .then(function() { return descargarYLeerConfiguracion(); })
+      .then(descargarYLeerConfiguracion)
       .catch(function(e) { console.error(e); });
   }
 
@@ -293,438 +324,300 @@ function iniciarApp() {
   function descargarYLeerConfiguracion() {
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) {
-          if (!r.ok) throw new Error("Código " + r.status);
-          return r.text();
-        })
-        .then(function(textoPlano) {
-          var datosObtenidos = procesarCSVNativo(textoPlano);
-          if (datosObtenidos && datosObtenidos.length > 0) {
-            datosConfiguracion = datosObtenidos;
-          } else { alert("CSV sin datos."); }
-          poblarSelectClientes();
-        }).catch(function(err) {
-          alert("Error cargando configuración desde SharePoint. Verifique el archivo CSV.");
+        .then(function(r) { return r.ok ? r.text() : ""; })
+        .then(function(texto) {
+          datosConfiguracion = procesarCSVNativo(texto);
+          var clientes = uniques(datosConfiguracion.map(function(f) { return f.cliente; }));
+          selCliente.innerHTML = '<option value="">Selecciona un cliente</option>' + clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
         });
     });
   }
 
+  function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
+
+  // SELECTORES DINÁMICOS FORMULARIO
   var selCliente = document.getElementById("selCliente");
   var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad");
   var selEstacion = document.getElementById("selEstacion");
 
-  function unicos(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
-
-  function poblarSelectClientes() {
-    var clientes = unicos(datosConfiguracion.map(function(f) { return f.cliente; }));
-    selCliente.innerHTML = '<option value="">Selecciona un cliente</option>' +
-      clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
-  }
-
   selCliente.addEventListener("change", function() {
-    var c = selCliente.value;
-    selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
-    selActividad.disabled = selEstacion.disabled = true;
-    if (!c) { selProyecto.disabled = true; return; }
-    var proyectos = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
-    selProyecto.innerHTML += proyectos.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join("");
+    var c = selCliente.value; selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
+    selActividad.disabled = selEstacion.disabled = true; if (!c) { selProyecto.disabled = true; return; }
+    var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
+    selProyecto.innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     selProyecto.disabled = false;
   });
 
   selProyecto.addEventListener("change", function() {
-    var c = selCliente.value, p = selProyecto.value;
-    selActividad.innerHTML = '<option value="">Selecciona una actividad</option>';
-    selEstacion.disabled = true;
-    if (!p) { selActividad.disabled = true; return; }
-    var actividades = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
-    selActividad.innerHTML += actividades.map(function(a) { return '<option value="' + a + '">' + a + '</option>'; }).join("");
+    var c = selCliente.value, p = selProyecto.value; selActividad.innerHTML = '<option value="">Selecciona una actividad</option>';
+    selEstacion.disabled = true; if (!p) { selActividad.disabled = true; return; }
+    var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
+    selActividad.innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     selActividad.disabled = false;
   });
 
   selActividad.addEventListener("change", function() {
-    var c = selCliente.value, p = selProyecto.value, a = selActividad.value;
-    selEstacion.innerHTML = '<option value="">Selecciona una estación o sitio</option>';
+    var c = selCliente.value, p = selProyecto.value, a = selActividad.value; selEstacion.innerHTML = '<option value="">Selecciona una estación</option>';
     if (!a) { selEstacion.disabled = true; return; }
-    var estaciones = unicos(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
-    selEstacion.innerHTML += estaciones.map(function(e) { return '<option value="' + e + '">' + e + '</option>'; }).join("");
+    var e = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
+    selEstacion.innerHTML += e.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     selEstacion.disabled = false;
   });
 
-  function capturarGPSAutomatico() {
-    var bar = document.getElementById("gpsStatusBar");
-    var txt = document.getElementById("gpsStatusTexto");
-    bar.className = "gps-status-bar gps-searching";
-    ubicacionCaptured = null;
-
-    if (!navigator.geolocation) { return; }
-    navigator.geolocation.getCurrentPosition(
-      function(pos) {
-        ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
-        bar.className = "gps-status-bar gps-success";
-        txt.textContent = "Coordenadas fijadas: " + ubicacionCapturada;
-      },
-      function(err) { bar.className = "gps-status-bar gps-error"; txt.textContent = "Sin GPS"; },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }
-
-  function inicializarBloqueFotos() {
-    estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(nombreItem) {
-      return { item: nombreItem, estado: "PENDIENTE", fotosList: [] };
-    });
-    renderizarBloqueFotos();
-  }
-
   function renderizarBloqueFotos() {
-    var contenedor = document.getElementById("listaFotosEstructurada");
-    contenedor.innerHTML = "";
-
+    var contenedor = document.getElementById("listaFotosEstructurada"); contenedor.innerHTML = "";
     estructuraFotos.forEach(function(foto, idx) {
-      var row = document.createElement("div");
-      row.className = "foto-item-row";
-
-      var headerRow = document.createElement("div");
-      headerRow.className = "foto-item-header";
-
-      var info = document.createElement("div");
-      info.className = "foto-item-info";
+      var row = document.createElement("div"); row.className = "foto-item-row";
+      var headerRow = document.createElement("div"); headerRow.className = "foto-item-header";
+      var info = document.createElement("div"); info.className = "foto-item-info";
+      var t = document.createElement("div"); t.className = "foto-item-title"; t.textContent = foto.item;
+      var est = document.createElement("div"); est.className = "foto-item-status";
       
-      var titulo = document.createElement("div");
-      titulo.className = "foto-item-title";
-      titulo.textContent = foto.item;
+      if (foto.estado === "PENDIENTE") { est.textContent = "❌ Pendiente local"; est.className += " status-pendiente"; }
+      else if (foto.estado === "TOMADA") { est.textContent = "📸 " + foto.fotosList.length + " por guardar"; est.className += " status-tomada"; }
+      else if (foto.estado === "SUBIDA") { est.textContent = "☁ Sincronizada en SharePoint (" + foto.fotosList.length + ")"; est.className += " status-subida"; }
+      else if (foto.estado === "NA") { est.textContent = "🚫 No Aplica"; est.className += " status-na"; }
 
-      var estado = document.createElement("div");
-      estado.className = "foto-item-status";
+      info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
+
+      var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
+      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Foto";
+      bF.addEventListener("click", function() { indiceItemSeleccionado = idx; document.getElementById("inputCapturaNativa").click(); });
+      var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
+      bN.addEventListener("click", function() { estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotos(); });
       
-      if (foto.estado === "PENDIENTE") {
-        estado.textContent = "❌ Pendiente local";
-        estado.className += " status-pendiente";
-      } else if (foto.estado === "TOMADA") {
-        estado.textContent = "📸 " + foto.fotosList.length + " por subir";
-        estado.className += " status-tomada";
-      } else if (foto.estado === "SUBIDA") {
-        estado.textContent = "☁ Subida a SharePoint (" + foto.fotosList.length + ")";
-        estado.className += " status-subida";
-      } else if (foto.estado === "NA") {
-        estado.textContent = "🚫 No Aplica";
-        estado.className += " status-na";
-      }
-
-      info.appendChild(titulo);
-      info.appendChild(estado);
-      headerRow.appendChild(info);
-
-      var actionsLayout = document.createElement("div");
-      actionsLayout.className = "foto-item-actions-layout";
-
-      var btnFoto = document.createElement("button");
-      btnFoto.type = "button";
-      btnFoto.className = "btn-accion-foto";
-      btnFoto.innerHTML = "<span>&#128247;</span> Foto";
-      btnFoto.addEventListener("click", function() {
-        indiceItemSeleccionado = idx;
-        document.getElementById("inputCapturaNativa").click();
-      });
-
-      var btnNA = document.createElement("button");
-      btnNA.type = "button";
-      btnNA.className = "btn-accion-na";
-      btnNA.textContent = "N/A";
-      btnNA.addEventListener("click", function() { marcarComoNoAplica(idx); });
-
-      actionsLayout.appendChild(btnFoto);
-      actionsLayout.appendChild(btnNA);
-      headerRow.appendChild(actionsLayout);
-      row.appendChild(headerRow);
+      acts.appendChild(bF); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
 
       if (foto.fotosList.length > 0) {
-        var thumbsCont = document.createElement("div");
-        thumbsCont.className = "thumbs-container";
-
+        var tc = document.createElement("div"); tc.className = "thumbs-container";
         foto.fotosList.forEach(function(fObj, fIdx) {
-          var wrap = document.createElement("div");
-          wrap.className = "thumb-wrapper";
-          var img = document.createElement("img");
-          img.src = fObj.previewUrl;
-          wrap.appendChild(img);
-
-          var btnDel = document.createElement("button");
-          btnDel.className = "btn-borrar-foto";
-          btnDel.type = "button";
-          btnDel.textContent = "×";
-          btnDel.addEventListener("click", function() { eliminarFotoEspecifica(idx, fIdx); });
-
-          wrap.appendChild(btnDel);
-          thumbsCont.appendChild(wrap);
+          var wrap = document.createElement("div"); wrap.className = "thumb-wrapper";
+          var img = document.createElement("img"); img.src = fObj.previewUrl; wrap.appendChild(img);
+          var bD = document.createElement("button"); bD.className = "btn-borrar-foto"; bD.type = "button"; bD.textContent = "×";
+          bD.addEventListener("click", function() {
+            item.fotosList.splice(fIdx, 1); if(item.fotosList.length === 0) item.estado = "PENDIENTE"; renderizarBloqueFotos();
+          });
+          wrap.appendChild(bD); tc.appendChild(wrap);
         });
-        row.appendChild(thumbsCont);
+        row.appendChild(tc);
       }
       contenedor.appendChild(row);
     });
   }
 
-  function marcarComoNoAplica(idx) {
-    estructuraFotos[idx].fotosList.forEach(function(fObj) { if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl); });
-    estructuraFotos[idx].estado = "NA";
-    estructuraFotos[idx].fotosList = [];
-    renderizarBloqueFotos();
-  }
-
-  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
-    var item = estructuraFotos[itemIdx];
-    if (item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
-    item.fotosList.splice(fotoIdx, 1);
-    if (item.fotosList.length === 0) item.estado = "PENDIENTE";
-    renderizarBloqueFotos();
-  }
-
   document.getElementById("inputCapturaNativa").addEventListener("change", function(e) {
     if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
-      var files = Array.from(e.target.files);
-      var itemActual = estructuraFotos[indiceItemSeleccionado];
-
+      var files = Array.from(e.target.files); var itemActual = estructuraFotos[indiceItemSeleccionado];
       itemActual.estado = "TOMADA";
-
-      var estacionText = selEstacion.value || "SITIO GENERAL";
-      var coordsText = ubicacionCapturada || "Buscando o sin GPS";
-      var hoy = new Date();
-      var fechaHoraText = hoy.toLocaleDateString() + " " + hoy.toLocaleTimeString();
-
-      files.forEach(function(file) {
+      var est = selEstacion.value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
+      
+      files.forEach(function(f) {
         procesandoMarcasDeAgua++;
-        estamparMarcaDeAgua(file, coordsText, estacionText, fechaHoraText, function(blobEstampado) {
-          if (blobEstampado) {
-            itemActual.fotosList.push({
-              file: blobEstampado,
-              previewUrl: URL.createObjectURL(blobEstampado),
-              subido: false // Bandera técnica de control
-            });
-          }
-          procesandoMarcasDeAgua--;
-          renderizarBloqueFotos();
+        estamparMarcaDeAgua(f, g, est, h, function(b) {
+          if (b) itemActual.fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" });
+          procesandoMarcasDeAgua--; renderizarBloqueFotos();
         });
       });
     }
-    e.target.value = ""; 
+    e.target.value = "";
   });
 
-  function estamparMarcaDeAgua(file, coordenadas, estacion, fechaHora, callback) {
-    var lector = new FileReader();
-    lector.readAsDataURL(file);
-    lector.onload = function(evento) {
-      var img = new Image();
-      img.src = evento.target.result;
+  function estamparMarcaDeAgua(f, c, e, h, cb) {
+    var r = new FileReader(); r.readAsDataURL(f);
+    r.onload = function(ev) {
+      var img = new Image(); img.src = ev.target.result;
       img.onload = function() {
-        var canvas = document.createElement("canvas");
-        var ctx = canvas.getContext("2d");
-        canvas.width = img.width; canvas.height = img.height;
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-
-        var altoCintillo = Math.round(canvas.height * 0.09); if (altoCintillo < 70) altoCintillo = 70; 
-        var tamanoFuente = Math.round(altoCintillo * 0.24); if (tamanoFuente < 15) tamanoFuente = 15;
-
-        ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - altoCintillo, canvas.width, altoCintillo);
-        ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tamanoFuente + "px Arial, sans-serif"; ctx.textBaseline = "middle";
-
-        var margenX = Math.round(canvas.width * 0.04);
-        ctx.fillText("ESTACIÓN: " + estacion.toUpperCase(), margenX, canvas.height - (altoCintillo * 0.68));
-        ctx.fillText("GPS: " + coordenadas + "  |  " + fechaHora, margenX, canvas.height - (altoCintillo * 0.32));
-
-        canvas.toBlob(function(blob) { callback(blob); }, "image/jpeg", 0.90);
+        var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
+        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0, img.width, img.height);
+        var ac = Math.max(70, Math.round(canvas.height * 0.09)), tf = Math.max(15, Math.round(ac * 0.24));
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - ac, canvas.width, ac);
+        ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
+        ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
+        ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
+        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.90);
       };
     };
   }
 
   function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
-
+  
   function obtenerRutaCarpetaInspeccion() {
-    var cliente = selCliente.value || "CLIENTE_SITIO";
-    var proyecto = selProyecto.value || "PROYECTO_SITIO";
-    var actividad = selActividad.value || "ACTIVIDAD";
-    var tecnico = document.getElementById("inpTecnico").value.trim() || "TECNICO";
-    var fecha = document.getElementById("inpFecha").value || "FECHA";
-    
-    // Usamos el identificador del sitio para fijar siempre la misma carpeta en tiempo real
-    var estacion = limpiarNombre(selEstacion.value || "SITIO");
-    return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(cliente) + "/" + limpiarNombre(proyecto) + "/" + fecha + "_" + estacion + "_" + limpiarNombre(tecnico);
+    var c = selCliente.value || "CLIENTE_SITIO", p = selProyecto.value || "PROYECTO_SITIO";
+    var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
+    return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(selEstacion.value || "SITIO") + "_" + limpiarNombre(t);
   }
 
-  // ACCIÓN DEL BOTÓN ACCIONADO POR CADA BLOQUE: SUBIDA INMEDIATA
+  // BOTÓN GUARDAR BLOQUE (CAMPO)
   document.getElementById("btnGuardarBloque1").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) {
-      alert("Por favor rellena la ubicación (Cliente, Proyecto, Estación) y el nombre del Técnico antes de subir fotos.");
-      return;
+      alert("Faltan datos de ubicación o nombre del técnico."); return;
     }
-    if (procesandoMarcasDeAgua > 0) { alert("Espera que terminen de procesarse las marcas de agua en las fotos."); return; }
-
-    var overlay = document.getElementById("estadoEnvio");
-    var overlayTexto = document.getElementById("estadoEnvioTexto");
-    overlay.classList.remove("oculto");
-
-    var rutaBase = obtenerRutaCarpetaInspeccion();
+    var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
+    ov.classList.remove("oculto"); var rb = obtenerRutaCarpetaInspeccion();
 
     obtenerToken().then(function(token) {
-      var listaSubidasParciales = [];
-      
+      var list = [];
       estructuraFotos.forEach(function(item) {
-        if (item.estado === "TOMADA") {
-          item.fotosList.forEach(function(fObj, index) {
+        if (item.estado === "TOMADA" || item.estado === "SUBIDA") {
+          item.fotosList.forEach(function(fObj, idx) {
             if (!fObj.subido) {
-              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (index + 1) + ".jpg";
-              listaSubidasParciales.push({ ruta: rutaBase + "/fotos/" + nombreArchivo, file: fObj.file, itemRef: item, fotoRef: fObj });
+              var nArch = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
+              fObj.filename = nArch;
+              list.push({ ruta: rb + "/fotos/" + nArch, file: fObj.file, itemRef: item, fotoRef: fObj });
             }
           });
         }
       });
 
-      if (listaSubidasParciales.length === 0) {
-        overlay.classList.add("oculto");
-        alert("No hay fotos nuevas por subir en este bloque o ya se guardaron.");
-        return;
-      }
-
-      var idxSubida = 0;
-      function subirSiguienteParcial() {
-        if (idxSubida >= listaSubidasParciales.length) return Promise.resolve();
-        overlayTexto.textContent = "Guardando en SharePoint: Foto " + (idxSubida + 1) + " de " + listaSubidasParciales.length + "...";
-        
-        var ejecucion = listaSubidasParciales[idxSubida];
-        return subirArchivo(token, ejecucion.ruta, ejecucion.file).then(function() {
-          ejecucion.fotoRef.subido = true;
-          ejecucion.itemRef.estado = "SUBIDA";
-          idxSubida++;
-          return subirSiguienteParcial();
+      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas por subir."); return; }
+      var i = 0;
+      function secuencial() {
+        if (i >= list.length) return Promise.resolve();
+        oT.textContent = "Subiendo archivo " + (i + 1) + " de " + list.length + "...";
+        var el = list[i];
+        return subirArchivo(token, el.ruta, el.file).then(function() {
+          el.fotoRef.subido = true; el.itemRef.estado = "SUBIDA"; i++; return secuencial();
         });
       }
-
-      return subirSiguienteParcial().then(function() {
-        overlay.classList.add("oculto");
-        alert("¡Bloque Guardado! Las fotos están disponibles en tu SharePoint.");
-        renderizarBloqueFotos();
-      });
-    }).catch(function(e) {
-      overlay.classList.add("oculto");
-      alert("Error subiendo el bloque: " + e.message);
-    });
+      return secuencial().then(function() { ov.classList.add("oculto"); alert("¡Fotos del bloque guardadas en SharePoint!"); renderizarBloqueFotos(); });
+    }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
 
-  // BOTÓN DE ENVÍO FINAL DE LA INSPECCIÓN DEFINITIVA (AFUERA DEL BLOQUE)
+  // BOTÓN DE SINCRONIZACIÓN (CAMPO CON ESCRITORIO)
+  document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
+    if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación para verificar."); return; }
+    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
+    document.getElementById("estadoEnvioTexto").textContent = "Verificando aprobaciones del Supervisor...";
+    var rb = obtenerRutaCarpetaInspeccion() + "/fotos";
+
+    obtenerToken().then(function(token) {
+      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + ":/children", { headers: { Authorization: "Bearer " + token } })
+        .then(function(r) { return r.ok ? r.json() : { value: [] }; })
+        .then(function(json) {
+          var archivosEnNube = json.value.map(function(itemNube) { return itemNube.name; });
+          
+          estructuraFotos.forEach(function(item) {
+            if (item.estado === "SUBIDA") {
+              // Filtramos las fotos de la lista local: conservamos solo las que siguen existiendo en la nube
+              item.fotosList = item.fotosList.filter(function(fObj) { return archivosEnNube.includes(fObj.filename); });
+              if (item.fotosList.length === 0) item.estado = "PENDIENTE";
+            }
+          });
+          ov.classList.add("oculto"); alert("Sincronización terminada. Se actualizaron los ítems rechazados."); renderizarBloqueFotos();
+        });
+    }).catch(function() { ov.classList.add("oculto"); });
+  });
+
+  // ENVIAR INSPECCIÓN COMPLETA
   document.getElementById("btnEnviar").addEventListener("click", function() {
-    var overlay = document.getElementById("estadoEnvio");
-    var overlayTexto = document.getElementById("estadoEnvioTexto");
-    document.getElementById("errorEnvioWrap").innerHTML = "";
+    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos."); return; }
+    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
+    document.getElementById("estadoEnvioTexto").textContent = "Consolidando reporte técnico...";
+    var rb = obtenerRutaCarpetaInspeccion();
 
-    // Validaciones básicas completas
-    if (!selCliente.value || !selEstacion.value) { alert("Completa los datos de ubicación."); return; }
-    if (!document.getElementById("inpTecnico").value.trim()) { alert("Escribe el nombre del técnico."); return; }
-
-    overlay.classList.remove("oculto");
-    overlayTexto.textContent = "Finalizando inspección y generando índices...";
-
-    var d = {
-      cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value,
-      estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(),
-      fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim()
-    };
-    
-    var rutaBase = obtenerRutaCarpetaInspeccion();
+    var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim() };
 
     obtenerToken().then(function(token) {
-      // 1. Validamos que no queden fotos en estado "TOMADA" sin darle guardar. Si quedan, las sube
-      var subidasPendientes = [];
-      estructuraFotos.forEach(function(item) {
-        if (item.estado === "TOMADA") {
-          item.fotosList.forEach(function(fObj, index) {
-            if (!fObj.subido) {
-              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (index + 1) + ".jpg";
-              subidasPendientes.push({ ruta: rutaBase + "/fotos/" + nombreArchivo, file: fObj.file, itemRef: item, fotoRef: fObj });
-            }
-          });
-        }
-      });
-
-      var sIdx = 0;
-      function vaciarUltimas() {
-        if (sIdx >= subidasPendientes.length) return Promise.resolve();
-        overlayTexto.textContent = "Subiendo fotos restantes (" + (sIdx+1) + ")...";
-        var tgt = subidasPendientes[sIdx];
-        return subirArchivo(token, tgt.ruta, tgt.file).then(function(){
-          tgt.fotoRef.subido = true; tgt.itemRef.estado = "SUBIDA"; sIdx++; return vaciarUltimas();
+      var csv = "REPORTE DE INSPECCION\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
+      return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }))
+        .then(function() { return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb, { headers: { Authorization: "Bearer " + token } }).then(function(r){return r.json();}); })
+        .then(function(j) { return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); })
+        .then(function() {
+          ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
+          document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección consolidada e indexada en el registro maestro.";
         });
-      }
-
-      return vaciarUltimas().then(function() {
-        // 2. Genera el reporte CSV del caso particular
-        var blobCSV = construirCSVReporte(d);
-        return subirArchivo(token, rutaBase + "/reporte_inspeccion.csv", blobCSV);
-      }).then(function() {
-        // 3. Obtiene URL para el log histórico
-        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaBase, { headers: { Authorization: "Bearer " + token } })
-          .then(function(r) { return r.ok ? r.json() : {}; }).then(function(j) { return j.webUrl || ""; });
-      }).then(function(linkCarpeta) {
-        // 4. Escribe en el maestro central
-        return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin coordenadas", linkCarpeta });
-      }).then(function() {
-        overlay.classList.add("oculto");
-        document.getElementById("appPrincipal").classList.add("oculto");
-        document.getElementById("pantallaExito").classList.remove("oculto");
-        document.getElementById("exitoDetalle").textContent = "Inspección guardada y registrada en el archivo maestro de control con éxito.";
-      });
-    }).catch(function(e) {
-      overlay.classList.add("oculto");
-      alert("Error al finalizar inspección: " + e.message);
-    });
+    }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  function construirCSVReporte(d) {
-    var lineas = ["REPORTE DE INSPECCION SITOC","Campo;Valor"];
-    lineas.push("Cliente;" + d.cliente); lineas.push("Proyecto;" + d.proyecto); lineas.push("Actividad;" + d.actividad);
-    lineas.push("Estacion o Sitio;" + d.estacion); lineas.push("Tecnico;" + d.tecnico); lineas.push("Fecha;" + d.fecha);
-    lineas.push("Ubicacion GPS;" + (ubicacionCapturada || "No registrada"));
-    lineas.push("Notas de campo;" + (d.notas ? d.notas.replace(/[\r\n;]/g, " ") : ""));
-    lineas.push("","ESTATUS DE ITEMS FOTOGRAFICOS","Item Requerido;Estatus;Cantidad");
-    estructuraFotos.forEach(function(f) {
-      var est = (f.estado === "SUBIDA" || f.estado === "TOMADA") ? "Cargada" : "No Aplica";
-      lineas.push(f.item + ";" + est + ";" + f.fotosList.length);
+  // ==========================================
+  // FUNCIONALIDAD ESCRITORIO / SUPERVISOR
+  // ==========================================
+  document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
+    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
+    document.getElementById("estadoEnvioTexto").textContent = "Buscando carpetas de inspecciones en SharePoint...";
+    
+    obtenerToken().then(function(token) {
+      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children?$expand=children", { headers: { Authorization: "Bearer " + token } })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+          var listaSelect = document.getElementById("selCarpetaMonitoreo");
+          listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
+          
+          function buscarSubcarpetas(items, prefijo) {
+            items.forEach(function(item) {
+              if (item.folder) {
+                var rutaCompleta = prefijo ? prefijo + "/" + item.name : item.name;
+                if (item.name.includes("_") && item.children && item.children.some(function(sub) { return sub.name === "fotos"; })) {
+                  var opt = document.createElement("option"); opt.value = CONFIG.carpetaRaizInspecciones + "/" + rutaCompleta + "/fotos";
+                  opt.textContent = "📍 Sitio: " + item.name; listaSelect.appendChild(opt);
+                } else if (item.children) {
+                  buscarSubcarpetas(item.children, rutaCompleta);
+                }
+              }
+            });
+          }
+          if (json.value) buscarSubcarpetas(json.value, "");
+          ov.classList.add("oculto"); alert("Búsqueda completada. Si hay técnicos cargando datos, aparecerán en la lista.");
+        });
+    }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
+  });
+
+  var selMonitoreo = document.getElementById("selCarpetaMonitoreo");
+  selMonitoreo.addEventListener("change", cargarGaleriaSupervisor);
+
+  function cargarGaleriaSupervisor() {
+    var rutaFotos = selMonitoreo.value; if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
+    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos del sitio...";
+    document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
+
+    obtenerToken().then(function(token) {
+      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaFotos + ":/children", { headers: { Authorization: "Bearer " + token } })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+          galeria.innerHTML = ""; if (!json.value || json.value.length === 0) { galeria.innerHTML = "El técnico aún no ha guardado fotos en este bloque."; return; }
+          
+          json.value.forEach(function(archivo) {
+            var card = document.createElement("div"); card.className = "card-foto-superv";
+            var img = document.createElement("img"); img.src = archivo["@microsoft.graph.downloadUrl"];
+            img.addEventListener("click", function() { window.open(archivo.webUrl, "_blank"); });
+
+            var meta = document.createElement("div"); meta.className = "meta";
+            meta.textContent = archivo.name.replace(/_/g, " ").replace(".jpg", "");
+
+            var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑 Rechazar / Eliminar";
+            btnR.addEventListener("click", function() {
+              if (confirm("¿Estás seguro de que deseas rechazar y borrar esta foto de SharePoint?")) {
+                var urlBorrar = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id;
+                fetch(urlBorrar, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) {
+                  if (r.ok) { alert("Foto eliminada."); cargarGaleriaSupervisor(); }
+                });
+              }
+            });
+
+            card.appendChild(img); card.appendChild(meta); card.appendChild(btnR); galeria.appendChild(card);
+          });
+        });
     });
-    return new Blob(["\uFEFF" + lineas.join("\r\n")], { type: "text/csv;charset=utf-8;" });
   }
 
   function subirArchivo(token, ruta, contenido) {
     return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + ruta + ":/content", {
-      method: "PUT",
-      headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" },
-      body: contenido
-    }).then(function(r) {
-      if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-      return r.json();
-    });
+      method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" }, body: contenido
+    }).then(function(r) { return r.json(); });
   }
 
   function registrarFilaTextoPlano(token, fila) {
     var url = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoMaestro + ":/content";
-    return fetch(url, { headers: { Authorization: "Bearer " + token } })
-      .then(function(r) {
-        var nuevaFila = fila.fecha + ";" + fila.tecnico + ";" + fila.cliente + ";" + fila.proyecto + ";" + fila.actividad + ";" + fila.estacion + ";" + fila.ubicacion + ";" + fila.linkCarpeta + "\r\n";
-        if (!r.ok) {
-          var cabecera = "\uFEFFFecha;Tecnico;Cliente;Proyecto;Actividad;Estacion;Ubicacion;Link_Carpeta\r\n";
-          return subirArchivo(token, CONFIG.archivoMaestro, new Blob([cabecera + nuevaFila], { type: "text/csv;charset=utf-8;" }));
-        }
-        return r.text().then(function(textoActual) {
-          if (textoActual && !textoActual.endsWith("\n")) { textoActual += "\r\n"; }
-          return subirArchivo(token, CONFIG.archivoMaestro, new Blob([textoActual + nuevaFila], { type: "text/csv;charset=utf-8;" }));
-        });
-      });
+    return fetch(url, { headers: { Authorization: "Bearer " + token } }).then(function(r) {
+      var nF = fila.fecha + ";" + fila.tecnico + ";" + fila.cliente + ";" + fila.proyecto + ";" + fila.actividad + ";" + fila.estacion + ";" + fila.ubicacion + ";" + fila.linkCarpeta + "\r\n";
+      if (!r.ok) return subirArchivo(token, CONFIG.archivoMaestro, new Blob(["\uFEFFFecha;Tecnico;Cliente;Proyecto;Actividad;Estacion;Ubicacion;Link_Carpeta\n" + nF], { type: "text/csv;" }));
+      return r.text().then(function(txt) { return subirArchivo(token, CONFIG.archivoMaestro, new Blob([txt + (txt.endsWith("\n") ? "" : "\n") + nF], { type: "text/csv;" })); });
+    });
   }
 
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() {
-    estructuraFotos.forEach(function(item) { item.fotosList.forEach(function(fObj) { if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl); }); });
-    document.getElementById("inpNotas").value = "";
-    capturarGPSAutomatico(); inicializarBloqueFotos();
-    selCliente.value = ""; selProyecto.innerHTML = selActividad.innerHTML = selEstacion.innerHTML = '<option value="">Elige el nivel anterior primero</option>';
-    selProyecto.disabled = selActividad.disabled = selEstacion.disabled = true;
-    document.getElementById("pantallaExito").classList.add("oculto"); document.getElementById("appPrincipal").classList.remove("oculto");
+    window.location.reload();
   });
 }
 
