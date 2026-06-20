@@ -592,46 +592,73 @@ function iniciarApp() {
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  // =======================================================
-  // NUEVO BUSCADOR PROFUNDO RECURSIVO PARA SUPERVISOR (V3)
+// =======================================================
+  // BUSCADOR EN TIEMPO REAL PARA SUPERVISOR (SIN RETRASO DE INDEXACIÓN)
   // =======================================================
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
+    if (!driveId) { alert("El Drive aún no se ha inicializado."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Rastreando de forma profunda todo SharePoint...";
+    document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
     
     var listaSelect = document.getElementById("selCarpetaMonitoreo");
     listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
 
     obtenerToken().then(function(token) {
-      // Usamos el buscador inteligente de Microsoft Graph en vez de listado plano
-      var urlSearch = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/root/search(q='fotos')";
-      return fetch(urlSearch, { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.json(); })
-        .then(function(json) {
-          if (!json.value || json.value.length === 0) {
-            ov.classList.add("oculto"); alert("No se encontraron carpetas con registros fotográficos recientes."); return;
-          }
+      // 1. Listar los clientes (primer nivel dentro de Inspecciones)
+      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children", { headers: { Authorization: "Bearer " + token } })
+        .then(function(r) { return r.ok ? r.json() : { value: [] }; })
+        .then(function(resClientes) {
+          var promesasProyectos = [];
           
-          json.value.forEach(function(item) {
-            // Validamos que sea una carpeta llamada "fotos" dentro de la jerarquía correcta
-            if (item.folder && item.name === "fotos" && item.parentReference && item.parentReference.path) {
-              var pathDecodificado = decodeURIComponent(item.parentReference.path);
-              if (pathDecodificado.includes("/root:/" + CONFIG.carpetaRaizInspecciones)) {
-                var partesRuta = pathDecodificado.split("/root:/");
-                var rutaLimpia = partesRuta[1] + "/fotos";
-                var nombreSitio = item.parentReference.name;
-
-                var opt = document.createElement("option");
-                opt.value = rutaLimpia;
-                opt.textContent = "📍 " + nombreSitio;
-                listaSelect.appendChild(opt);
-              Partidos = true;
-              }
+          resClientes.value.forEach(function(itemCliente) {
+            if (itemCliente.folder) {
+              var rutaCliente = CONFIG.carpetaRaizInspecciones + "/" + itemCliente.name;
+              // 2. Para cada cliente, listar sus proyectos
+              var p = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaCliente + ":/children", { headers: { Authorization: "Bearer " + token } })
+                .then(function(r) { return r.ok ? r.json() : { value: [] }; })
+                .then(function(resProyectos) {
+                  var promesasSitios = [];
+                  
+                  resProyectos.value.forEach(function(itemProyecto) {
+                    if (itemProyecto.folder) {
+                      var rutaProyecto = rutaCliente + "/" + itemProyecto.name;
+                      // 3. Para cada proyecto, listar las carpetas de inspección finales
+                      var s = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaProyecto + ":/children", { headers: { Authorization: "Bearer " + token } })
+                        .then(function(r) { return r.ok ? r.json() : { value: [] }; })
+                        .then(function(resSitios) {
+                          resSitios.value.forEach(function(itemSitio) {
+                            // Validamos que sea una carpeta de inspección (contiene guiones bajos de fecha/técnico)
+                            if (itemSitio.folder && itemSitio.name.includes("_")) {
+                              var opt = document.createElement("option");
+                              opt.value = rutaProyecto + "/" + itemSitio.name + "/fotos";
+                              opt.textContent = "📍 Sitio: " + itemSitio.name;
+                              listaSelect.appendChild(opt);
+                            }
+                          });
+                        });
+                      promesasSitios.push(s);
+                    }
+                  });
+                  return Promise.all(promesasSitios);
+                });
+              promesasProyectos.push(p);
             }
           });
-          ov.classList.add("oculto"); alert("Rastreo terminado. Ahora sí verás los bloques guardados en la lista.");
+          
+          return Promise.all(promesasProyectos);
+        })
+        .then(function() {
+          ov.classList.add("oculto");
+          if (listaSelect.options.length <= 1) {
+            alert("No se encontraron carpetas de inspección creadas en la ruta estándar de SharePoint.");
+          } else {
+            alert("Rastreo en tiempo real completado. Sitios listados con éxito.");
+          }
         });
-    }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
+    }).catch(function(e) { 
+      ov.classList.add("oculto"); 
+      alert("Error en el rastreo: " + e.message); 
+    });
   });
 
   var selMonitoreo = document.getElementById("selCarpetaMonitoreo");
