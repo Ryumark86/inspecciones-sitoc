@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Panel Unificado (Campo/Supervisión)</title>
+<title>Inspecciones SITOC - Panel Unificado con Vista Grande</title>
 <script>
 (function() {
   var urls = [
@@ -54,7 +54,6 @@
   textarea{resize:vertical;min-height:80px;}
   
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
-  .btn-primario:disabled{background:#c9c9c9;cursor:not-allowed;}
   
   .btn-bloque{width:100%;padding:12px;background:var(--azul);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}
   .btn-secundario-bloque{width:100%;padding:10px;background:#fff;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;}
@@ -78,11 +77,15 @@
   .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px;}
 
   .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
-  .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde);}
-  .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover;}
-  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold;}
+  .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
+  .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover; cursor: pointer;}
+  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 0; z-index: 2;}
 
-  /* ESTILOS PANEL SUPERVISOR */
+  /* VENTANA PREVISUALIZACIÓN GIGANTE (MODAL) */
+  #modalVisorGrande {position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; cursor: pointer;}
+  #modalVisorGrande img {max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2);}
+  #modalVisorGrande p {color: #fff; margin-top: 14px; font-size: 14px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px;}
+
   .grid-supervisor-fotos {display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 14px;}
   .card-foto-superv {background: #fafafa; border: 1px solid var(--gris-borde); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;}
   .card-foto-superv img {width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid var(--gris-borde); cursor: pointer;}
@@ -122,6 +125,7 @@
     </div>
   </header>
   
+  <!-- INTERFAZ TÉCNICO (CAMPO) -->
   <main id="vistaCampo">
     <div class="card">
       <h2>Ubicación de trabajo</h2>
@@ -157,6 +161,7 @@
     <button class="btn-primario" id="btnEnviar">Enviar inspección definitiva</button>
   </main>
 
+  <!-- INTERFAZ SUPERVISOR (ESCRITORIO) -->
   <main id="vistaSupervisor" class="oculto">
     <div class="card">
       <h2>Panel de Control y Monitoreo en Vivo</h2>
@@ -177,7 +182,14 @@
   </main>
 </div>
 
+<!-- CAPTURA NATIVA CORREGIDA PARA DISPARAR LA CÁMARA INMEDIATAMENTE -->
 <input type="file" id="inputCapturaNativa" accept="image/*" capture="environment">
+
+<!-- VENTANA FLOTANTE DE PANTALLA COMPLETA (MODAL VISOR) -->
+<div id="modalVisorGrande" class="oculto">
+  <img id="imgVisorGrandeTarget" src="" alt="Vista Previa">
+  <p>Toca cualquier parte de la pantalla para regresar</p>
+</div>
 
 <div id="estadoEnvio" class="oculto">
   <div class="spinner"></div>
@@ -335,7 +347,7 @@ function iniciarApp() {
 
   function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
-  // SELECTORES DINÁMICOS FORMULARIO
+  // SELECTORES DINÁMICOS
   var selCliente = document.getElementById("selCliente");
   var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad");
@@ -393,11 +405,22 @@ function iniciarApp() {
         var tc = document.createElement("div"); tc.className = "thumbs-container";
         foto.fotosList.forEach(function(fObj, fIdx) {
           var wrap = document.createElement("div"); wrap.className = "thumb-wrapper";
-          var img = document.createElement("img"); img.src = fObj.previewUrl; wrap.appendChild(img);
+          
+          var img = document.createElement("img"); 
+          img.src = fObj.previewUrl; 
+          // FUNCIÓN PARA VER EN GRANDE EN EL CELULAR AL TOCAR
+          img.addEventListener("click", function() {
+            abrirVisorGrande(fObj.previewUrl);
+          });
+          
+          wrap.appendChild(img);
+
+          // ACCIÓN DE BORRADO DESDE EL CELULAR CORREGIDA (REMOVER DE LISTA LOCAL)
           var bD = document.createElement("button"); bD.className = "btn-borrar-foto"; bD.type = "button"; bD.textContent = "×";
           bD.addEventListener("click", function() {
-            item.fotosList.splice(fIdx, 1); if(item.fotosList.length === 0) item.estado = "PENDIENTE"; renderizarBloqueFotos();
+            eliminarFotoEspecifica(idx, fIdx);
           });
+          
           wrap.appendChild(bD); tc.appendChild(wrap);
         });
         row.appendChild(tc);
@@ -405,6 +428,33 @@ function iniciarApp() {
       contenedor.appendChild(row);
     });
   }
+
+  // FUNCIÓN CORREGIDA DE BORRADO DE FOTO EN EL CELULAR
+  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
+    var item = estructuraFotos[itemIdx];
+    if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) {
+      URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); // Libera memoria
+    }
+    item.fotosList.splice(fotoIdx, 1); // Quita el archivo exacto de la lista
+    
+    if (item.fotosList.length === 0) {
+      item.estado = "PENDIENTE";
+    }
+    renderizarBloqueFotos(); // Redibuja los cambios
+  }
+
+  // MANEJO DE PREVISUALIZACIÓN GIGANTE EN PANTALLA COMPLETA
+  function abrirVisorGrande(url) {
+    var modal = document.getElementById("modalVisorGrande");
+    var targetImg = document.getElementById("imgVisorGrandeTarget");
+    targetImg.src = url;
+    modal.classList.remove("oculto"); // Muestra la ventana
+  }
+
+  // Cerrar visor grande al tocar la pantalla
+  document.getElementById("modalVisorGrande").addEventListener("click", function() {
+    this.classList.add("oculto");
+  });
 
   document.getElementById("inputCapturaNativa").addEventListener("change", function(e) {
     if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
@@ -448,7 +498,7 @@ function iniciarApp() {
     return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(selEstacion.value || "SITIO") + "_" + limpiarNombre(t);
   }
 
-  // BOTÓN GUARDAR BLOQUE (CAMPO)
+  // SUBIR BLOQUE A SHAREPOINT
   document.getElementById("btnGuardarBloque1").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) {
       alert("Faltan datos de ubicación o nombre del técnico."); return;
@@ -484,7 +534,7 @@ function iniciarApp() {
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
 
-  // BOTÓN DE SINCRONIZACIÓN (CAMPO CON ESCRITORIO)
+  // VERIFICAR FOTOS EN ESCRITORIO
   document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación para verificar."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
@@ -499,7 +549,6 @@ function iniciarApp() {
           
           estructuraFotos.forEach(function(item) {
             if (item.estado === "SUBIDA") {
-              // Filtramos las fotos de la lista local: conservamos solo las que siguen existiendo en la nube
               item.fotosList = item.fotosList.filter(function(fObj) { return archivosEnNube.includes(fObj.filename); });
               if (item.fotosList.length === 0) item.estado = "PENDIENTE";
             }
@@ -509,7 +558,7 @@ function iniciarApp() {
     }).catch(function() { ov.classList.add("oculto"); });
   });
 
-  // ENVIAR INSPECCIÓN COMPLETA
+  // CONSOLIDACIÓN GENERAL FIN
   document.getElementById("btnEnviar").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
@@ -530,9 +579,7 @@ function iniciarApp() {
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  // ==========================================
-  // FUNCIONALIDAD ESCRITORIO / SUPERVISOR
-  // ==========================================
+  // PANEL SUPERVISOR SHP
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Buscando carpetas de inspecciones en SharePoint...";
@@ -551,14 +598,12 @@ function iniciarApp() {
                 if (item.name.includes("_") && item.children && item.children.some(function(sub) { return sub.name === "fotos"; })) {
                   var opt = document.createElement("option"); opt.value = CONFIG.carpetaRaizInspecciones + "/" + rutaCompleta + "/fotos";
                   opt.textContent = "📍 Sitio: " + item.name; listaSelect.appendChild(opt);
-                } else if (item.children) {
-                  buscarSubcarpetas(item.children, rutaCompleta);
-                }
+                } else if (item.children) { buscarSubcarpetas(item.children, rutaCompleta); }
               }
             });
           }
           if (json.value) buscarSubcarpetas(json.value, "");
-          ov.classList.add("oculto"); alert("Búsqueda completada. Si hay técnicos cargando datos, aparecerán en la lista.");
+          ov.classList.add("oculto"); alert("Búsqueda completada.");
         });
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
@@ -568,14 +613,14 @@ function iniciarApp() {
 
   function cargarGaleriaSupervisor() {
     var rutaFotos = selMonitoreo.value; if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
-    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos del sitio...";
+    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos...";
     document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
 
     obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaFotos + ":/children", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { return r.json(); })
         .then(function(json) {
-          galeria.innerHTML = ""; if (!json.value || json.value.length === 0) { galeria.innerHTML = "El técnico aún no ha guardado fotos en este bloque."; return; }
+          galeria.innerHTML = ""; if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía."; return; }
           
           json.value.forEach(function(archivo) {
             var card = document.createElement("div"); card.className = "card-foto-superv";
@@ -587,14 +632,13 @@ function iniciarApp() {
 
             var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑 Rechazar / Eliminar";
             btnR.addEventListener("click", function() {
-              if (confirm("¿Estás seguro de que deseas rechazar y borrar esta foto de SharePoint?")) {
+              if (confirm("¿Deseas eliminar esta foto de SharePoint?")) {
                 var urlBorrar = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id;
                 fetch(urlBorrar, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) {
                   if (r.ok) { alert("Foto eliminada."); cargarGaleriaSupervisor(); }
                 });
               }
             });
-
             card.appendChild(img); card.appendChild(meta); card.appendChild(btnR); galeria.appendChild(card);
           });
         });
@@ -616,9 +660,7 @@ function iniciarApp() {
     });
   }
 
-  document.getElementById("btnNuevaInspeccion").addEventListener("click", function() {
-    window.location.reload();
-  });
+  document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
 }
 
 function esperarMSAL(intentos) {
