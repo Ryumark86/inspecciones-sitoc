@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Panel Unificado con Vista Grande</title>
+<title>Inspecciones SITOC - Panel Unificado V3</title>
 <script>
 (function() {
   var urls = [
@@ -81,7 +81,14 @@
   .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover; cursor: pointer;}
   .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 0; z-index: 2;}
 
-  /* VENTANA PREVISUALIZACIÓN GIGANTE (MODAL) */
+  /* VENTANA OPCIONES ORIGEN FOTO (MENU EMERGENTE) */
+  #modalOrigenFoto {position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: flex; align-items: flex-end; justify-content: center;}
+  .origen-sheet {background: #fff; width: 100%; max-width: 500px; border-radius: 16px 16px 0 0; padding: 20px; box-shadow: 0 -4px 12px rgba(0,0,0,0.15);}
+  .origen-sheet h3 {margin: 0 0 16px; font-size: 16px; color: var(--azul-osc); text-align: center;}
+  .origen-opciones {display: flex; flex-direction: column; gap: 10px;}
+  .btn-origen {width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--gris-borde); font-size: 16px; font-weight: 600; background: #fafafa; cursor: pointer; text-align: center; color: var(--texto);}
+  .btn-origen-cancelar {background: #eef1f3; border: none; color: var(--rojo); margin-top: 6px;}
+
   #modalVisorGrande {position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; cursor: pointer;}
   #modalVisorGrande img {max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2);}
   #modalVisorGrande p {color: #fff; margin-top: 14px; font-size: 14px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px;}
@@ -125,7 +132,6 @@
     </div>
   </header>
   
-  <!-- INTERFAZ TÉCNICO (CAMPO) -->
   <main id="vistaCampo">
     <div class="card">
       <h2>Ubicación de trabajo</h2>
@@ -145,7 +151,7 @@
       <label for="inpFecha">Fecha</label>
       <input type="date" id="inpFecha">
       <div id="gpsStatusBar" class="gps-status-bar">&#128205; <span id="gpsStatusTexto">Buscando coordenadas GPS automáticamente...</span></div>
-      <label for="inpNotas">Notas / observaciones generales</label>
+      <label for="inpNotas">Notes / observaciones generales</label>
       <textarea id="inpNotas" placeholder="Describe lo encontrado..."></textarea>
     </div>
     
@@ -161,7 +167,6 @@
     <button class="btn-primario" id="btnEnviar">Enviar inspección definitiva</button>
   </main>
 
-  <!-- INTERFAZ SUPERVISOR (ESCRITORIO) -->
   <main id="vistaSupervisor" class="oculto">
     <div class="card">
       <h2>Panel de Control y Monitoreo en Vivo</h2>
@@ -175,20 +180,30 @@
 
     <div class="card oculto" id="cardGaleriaSupervisor">
       <h2>Fotos Recibidas en este Sitio</h2>
-      <div class="subtitulo-bloque">Si una foto no cumple los criterios, presione "Rechazar" para eliminarla y notificar al celular del técnico.</div>
+      <div class="subtitulo-bloque">Si una foto no cumple los criterios, presione "Rechazar" para eliminarla.</div>
       
       <div id="galeriaFotosSupervisor" class="grid-supervisor-fotos"></div>
     </div>
   </main>
 </div>
 
-<!-- CAPTURA NATIVA CORREGIDA PARA DISPARAR LA CÁMARA INMEDIATAMENTE -->
-<input type="file" id="inputCapturaNativa" accept="image/*" capture="environment">
+<input type="file" id="inputCapturaCamara" accept="image/*" capture="environment">
+<input type="file" id="inputCapturaGaleria" accept="image/*" multiple>
 
-<!-- VENTANA FLOTANTE DE PANTALLA COMPLETA (MODAL VISOR) -->
+<div id="modalOrigenFoto" class="oculto">
+  <div class="origen-sheet">
+    <h3>¿Cómo deseas añadir la foto?</h3>
+    <div class="origen-opciones">
+      <button class="btn-origen" id="btnLlamarCamara">📸 Tomar Foto con Cámara</button>
+      <button class="btn-origen" id="btnLlamarGaleria">📁 Seleccionar de Galería</button>
+      <button class="btn-origen btn-origen-cancelar" id="btnCancelarOrigen">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalVisorGrande" class="oculto">
   <img id="imgVisorGrandeTarget" src="" alt="Vista Previa">
-  <p>Toca cualquier parte de la pantalla para regresar</p>
+  <p>Toca la pantalla para regresar</p>
 </div>
 
 <div id="estadoEnvio" class="oculto">
@@ -276,7 +291,6 @@ function iniciarApp() {
   });
   document.getElementById("btnLogout").addEventListener("click", function() { msalInstance.logoutRedirect(); });
 
-  // CONMUTACIÓN DE VISTAS (CAMPO VS SUPERVISOR)
   document.getElementById("navCampo").addEventListener("click", function() {
     document.getElementById("navCampo").classList.add("btn-nav-active");
     document.getElementById("navSupervisor").classList.remove("btn-nav-active");
@@ -347,7 +361,6 @@ function iniciarApp() {
 
   function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
-  // SELECTORES DINÁMICOS
   var selCliente = document.getElementById("selCliente");
   var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad");
@@ -394,8 +407,14 @@ function iniciarApp() {
       info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
 
       var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
-      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Foto";
-      bF.addEventListener("click", function() { indiceItemSeleccionado = idx; document.getElementById("inputCapturaNativa").click(); });
+      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Añadir";
+      
+      // DESPLEGAR EL MENÚ DE SELECCIÓN DE ORIGEN
+      bF.addEventListener("click", function() { 
+        indiceItemSeleccionado = idx; 
+        document.getElementById("modalOrigenFoto").classList.remove("oculto");
+      });
+      
       var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
       bN.addEventListener("click", function() { estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotos(); });
       
@@ -405,22 +424,12 @@ function iniciarApp() {
         var tc = document.createElement("div"); tc.className = "thumbs-container";
         foto.fotosList.forEach(function(fObj, fIdx) {
           var wrap = document.createElement("div"); wrap.className = "thumb-wrapper";
-          
-          var img = document.createElement("img"); 
-          img.src = fObj.previewUrl; 
-          // FUNCIÓN PARA VER EN GRANDE EN EL CELULAR AL TOCAR
-          img.addEventListener("click", function() {
-            abrirVisorGrande(fObj.previewUrl);
-          });
-          
+          var img = document.createElement("img"); img.src = fObj.previewUrl; 
+          img.addEventListener("click", function() { abrirVisorGrande(fObj.previewUrl); });
           wrap.appendChild(img);
 
-          // ACCIÓN DE BORRADO DESDE EL CELULAR CORREGIDA (REMOVER DE LISTA LOCAL)
           var bD = document.createElement("button"); bD.className = "btn-borrar-foto"; bD.type = "button"; bD.textContent = "×";
-          bD.addEventListener("click", function() {
-            eliminarFotoEspecifica(idx, fIdx);
-          });
-          
+          bD.addEventListener("click", function() { eliminarFotoEspecifica(idx, fIdx); });
           wrap.appendChild(bD); tc.appendChild(wrap);
         });
         row.appendChild(tc);
@@ -429,36 +438,38 @@ function iniciarApp() {
     });
   }
 
-  // FUNCIÓN CORREGIDA DE BORRADO DE FOTO EN EL CELULAR
-  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
-    var item = estructuraFotos[itemIdx];
-    if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) {
-      URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); // Libera memoria
-    }
-    item.fotosList.splice(fotoIdx, 1); // Quita el archivo exacto de la lista
-    
-    if (item.fotosList.length === 0) {
-      item.estado = "PENDIENTE";
-    }
-    renderizarBloqueFotos(); // Redibuja los cambios
-  }
-
-  // MANEJO DE PREVISUALIZACIÓN GIGANTE EN PANTALLA COMPLETA
-  function abrirVisorGrande(url) {
-    var modal = document.getElementById("modalVisorGrande");
-    var targetImg = document.getElementById("imgVisorGrandeTarget");
-    targetImg.src = url;
-    modal.classList.remove("oculto"); // Muestra la ventana
-  }
-
-  // Cerrar visor grande al tocar la pantalla
-  document.getElementById("modalVisorGrande").addEventListener("click", function() {
-    this.classList.add("oculto");
+  // ACCIONES DEL MENÚ DE ORIGEN DE FOTOS
+  document.getElementById("btnLlamarCamara").addEventListener("click", function() {
+    document.getElementById("modalOrigenFoto").classList.add("oculto");
+    document.getElementById("inputCapturaCamara").click();
+  });
+  document.getElementById("btnLlamarGaleria").addEventListener("click", function() {
+    document.getElementById("modalOrigenFoto").classList.add("oculto");
+    document.getElementById("inputCapturaGaleria").click();
+  });
+  document.getElementById("btnCancelarOrigen").addEventListener("click", function() {
+    document.getElementById("modalOrigenFoto").classList.add("oculto");
   });
 
-  document.getElementById("inputCapturaNativa").addEventListener("change", function(e) {
-    if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
-      var files = Array.from(e.target.files); var itemActual = estructuraFotos[indiceItemSeleccionado];
+  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
+    var item = estructuraFotos[itemIdx];
+    if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
+    item.fotosList.splice(fotoIdx, 1);
+    if (item.fotosList.length === 0) item.estado = "PENDIENTE";
+    renderizarBloqueFotos();
+  }
+
+  function abrirVisorGrande(url) {
+    var modal = document.getElementById("modalVisorGrande");
+    document.getElementById("imgVisorGrandeTarget").src = url;
+    modal.classList.remove("oculto");
+  }
+  document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
+
+  // PROCESAR FOTOS (COMÚN PARA AMBOS INPUTS)
+  function procesarArchivosSeleccionados(files) {
+    if (files.length > 0 && indiceItemSeleccionado !== null) {
+      var itemActual = estructuraFotos[indiceItemSeleccionado];
       itemActual.estado = "TOMADA";
       var est = selEstacion.value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
       
@@ -470,7 +481,13 @@ function iniciarApp() {
         });
       });
     }
-    e.target.value = "";
+  }
+
+  document.getElementById("inputCapturaCamara").addEventListener("change", function(e) {
+    procesarArchivosSeleccionados(Array.from(e.target.files)); e.target.value = "";
+  });
+  document.getElementById("inputCapturaGaleria").addEventListener("change", function(e) {
+    procesarArchivosSeleccionados(Array.from(e.target.files)); e.target.value = "";
   });
 
   function estamparMarcaDeAgua(f, c, e, h, cb) {
@@ -498,7 +515,7 @@ function iniciarApp() {
     return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(selEstacion.value || "SITIO") + "_" + limpiarNombre(t);
   }
 
-  // SUBIR BLOQUE A SHAREPOINT
+  // BOTÓN GUARDAR BLOQUE 1
   document.getElementById("btnGuardarBloque1").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) {
       alert("Faltan datos de ubicación o nombre del técnico."); return;
@@ -520,7 +537,7 @@ function iniciarApp() {
         }
       });
 
-      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas por subir."); return; }
+      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas por guardar."); return; }
       var i = 0;
       function secuencial() {
         if (i >= list.length) return Promise.resolve();
@@ -530,15 +547,14 @@ function iniciarApp() {
           el.fotoRef.subido = true; el.itemRef.estado = "SUBIDA"; i++; return secuencial();
         });
       }
-      return secuencial().then(function() { ov.classList.add("oculto"); alert("¡Fotos del bloque guardadas en SharePoint!"); renderizarBloqueFotos(); });
+      return secuencial().then(function() { ov.classList.add("oculto"); alert("¡Fotos guardadas!"); renderizarBloqueFotos(); });
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
 
-  // VERIFICAR FOTOS EN ESCRITORIO
   document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación para verificar."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Verificando aprobaciones del Supervisor...";
+    document.getElementById("estadoEnvioTexto").textContent = "Sincronizando con Supervisor...";
     var rb = obtenerRutaCarpetaInspeccion() + "/fotos";
 
     obtenerToken().then(function(token) {
@@ -546,25 +562,22 @@ function iniciarApp() {
         .then(function(r) { return r.ok ? r.json() : { value: [] }; })
         .then(function(json) {
           var archivosEnNube = json.value.map(function(itemNube) { return itemNube.name; });
-          
           estructuraFotos.forEach(function(item) {
             if (item.estado === "SUBIDA") {
               item.fotosList = item.fotosList.filter(function(fObj) { return archivosEnNube.includes(fObj.filename); });
               if (item.fotosList.length === 0) item.estado = "PENDIENTE";
             }
           });
-          ov.classList.add("oculto"); alert("Sincronización terminada. Se actualizaron los ítems rechazados."); renderizarBloqueFotos();
+          ov.classList.add("oculto"); alert("Sincronización terminada."); renderizarBloqueFotos();
         });
     }).catch(function() { ov.classList.add("oculto"); });
   });
 
-  // CONSOLIDACIÓN GENERAL FIN
   document.getElementById("btnEnviar").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Consolidando reporte técnico...";
     var rb = obtenerRutaCarpetaInspeccion();
-
     var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim() };
 
     obtenerToken().then(function(token) {
@@ -574,36 +587,49 @@ function iniciarApp() {
         .then(function(j) { return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); })
         .then(function() {
           ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-          document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección consolidada e indexada en el registro maestro.";
+          document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección consolidada indexada.";
         });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  // PANEL SUPERVISOR SHP
+  // =======================================================
+  // NUEVO BUSCADOR PROFUNDO RECURSIVO PARA SUPERVISOR (V3)
+  // =======================================================
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Buscando carpetas de inspecciones en SharePoint...";
+    document.getElementById("estadoEnvioTexto").textContent = "Rastreando de forma profunda todo SharePoint...";
     
+    var listaSelect = document.getElementById("selCarpetaMonitoreo");
+    listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
+
     obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children?$expand=children", { headers: { Authorization: "Bearer " + token } })
+      // Usamos el buscador inteligente de Microsoft Graph en vez de listado plano
+      var urlSearch = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/root/search(q='fotos')";
+      return fetch(urlSearch, { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { return r.json(); })
         .then(function(json) {
-          var listaSelect = document.getElementById("selCarpetaMonitoreo");
-          listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
-          
-          function buscarSubcarpetas(items, prefijo) {
-            items.forEach(function(item) {
-              if (item.folder) {
-                var rutaCompleta = prefijo ? prefijo + "/" + item.name : item.name;
-                if (item.name.includes("_") && item.children && item.children.some(function(sub) { return sub.name === "fotos"; })) {
-                  var opt = document.createElement("option"); opt.value = CONFIG.carpetaRaizInspecciones + "/" + rutaCompleta + "/fotos";
-                  opt.textContent = "📍 Sitio: " + item.name; listaSelect.appendChild(opt);
-                } else if (item.children) { buscarSubcarpetas(item.children, rutaCompleta); }
-              }
-            });
+          if (!json.value || json.value.length === 0) {
+            ov.classList.add("oculto"); alert("No se encontraron carpetas con registros fotográficos recientes."); return;
           }
-          if (json.value) buscarSubcarpetas(json.value, "");
-          ov.classList.add("oculto"); alert("Búsqueda completada.");
+          
+          json.value.forEach(function(item) {
+            // Validamos que sea una carpeta llamada "fotos" dentro de la jerarquía correcta
+            if (item.folder && item.name === "fotos" && item.parentReference && item.parentReference.path) {
+              var pathDecodificado = decodeURIComponent(item.parentReference.path);
+              if (pathDecodificado.includes("/root:/" + CONFIG.carpetaRaizInspecciones)) {
+                var partesRuta = pathDecodificado.split("/root:/");
+                var rutaLimpia = partesRuta[1] + "/fotos";
+                var nombreSitio = item.parentReference.name;
+
+                var opt = document.createElement("option");
+                opt.value = rutaLimpia;
+                opt.textContent = "📍 " + nombreSitio;
+                listaSelect.appendChild(opt);
+              Partidos = true;
+              }
+            }
+          });
+          ov.classList.add("oculto"); alert("Rastreo terminado. Ahora sí verás los bloques guardados en la lista.");
         });
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
@@ -613,7 +639,7 @@ function iniciarApp() {
 
   function cargarGaleriaSupervisor() {
     var rutaFotos = selMonitoreo.value; if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
-    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos...";
+    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos del sitio...";
     document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
 
     obtenerToken().then(function(token) {
