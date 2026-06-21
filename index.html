@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.3</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.4</title>
 <script>
 (function() {
   var urls = [
@@ -243,7 +243,7 @@ var ITEMS_FOTOS_PLANTILLA = [
   "Foto de la conexión y termoencogible cable de tierra"
 ];
 
-// VARIABLES CON ALCANCE GLOBAL CORREGIDAS
+// VARIABLES GLOBALES DE FLUJO
 var dbInspecciones = null;
 var datosConfiguracion = []; 
 var estructuraFotos = [];
@@ -252,27 +252,41 @@ var bloqueadorEventosDropdowns = false;
 
 function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
-// Función nativa básica para procesar el CSV sin librerías externas
-function procesarCSVNativo(texto) {
-  var lineas = texto.split(/\r?\n/);
-  var resultado = [];
-  if (lineas.length <= 1) return resultado;
-  
-  // Asumimos formato: Cliente;Proyecto;Actividad;Estacion
-  for (var i = 1; i < lineas.length; i++) {
-    var fila = lineas[i].trim();
-    if (!fila) continue;
-    var columnas = fila.split(";");
-    if (columnas.length >= 4) {
-      resultado.push({
-        cliente: columnas[0].trim(),
-        proyecto: columnas[1].trim(),
-        actividad: columnas[2].trim(),
-        estacion: columnas[3].trim()
-      });
+// FIX CLAVE: Función híbrida con detección automática de comas y puntos y comas
+function procesarCSVNativo(textoPlano) {
+  try {
+    var lineas = textoPlano.split(/\r?\n/); 
+    var filasMapeadas = [];
+    if (lineas.length <= 1) return filasMapeadas;
+
+    for (var i = 0; i < lineas.length; i++) {
+      var linea = lineas[i].trim(); 
+      if (!linea) continue;
+      
+      // Evalúa de forma dinámica el separador nativo del archivo cargado en la nube
+      var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
+      
+      var cli = celdas[0] ? celdas[0].trim() : ""; 
+      var pro = celdas[1] ? celdas[1].trim() : "";
+      var act = celdas[2] ? celdas[2].trim() : ""; 
+      var est = celdas[3] ? celdas[3].trim() : "";
+      
+      if (i === 0 && cli.toLowerCase().includes("client")) continue;
+      
+      if (cli && pro) {
+        filasMapeadas.push({ 
+          cliente: cli.toUpperCase(), 
+          proyecto: pro.toUpperCase(), 
+          actividad: act ? act.toUpperCase() : "INSTALACION", 
+          estacion: est ? est.toUpperCase() : "SITIO GENERAL" 
+        });
+      }
     }
+    return filasMapeadas;
+  } catch(e) { 
+    console.error("Error procesando CSV:", e); 
+    return []; 
   }
-  return resultado;
 }
 
 function inicializarBaseDatosMultitarea() {
@@ -408,7 +422,7 @@ window.cargarBorradorEspecificoClick = function(idSitio) {
       });
 
       // Renderizamos la UI limpia de fotos
-      var renderizadoEstructuraFotos = window.actualizarInterfazFotosGlobal || function() { console.log("Pendiente iniciar UI"); };
+      var renderizadoEstructuraFotos = window.actualizarInterfazFotosGlobal || function() { console.log("Iniciando interfaz..."); };
       renderizadoEstructuraFotos();
       
       bloqueadorEventosDropdowns = false;
@@ -521,9 +535,7 @@ function iniciarApp() {
     estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
     renderizarBloqueFotos();
     
-    // Compartimos la función con la ventana global para el re-pintado automático
     window.actualizarInterfazFotosGlobal = renderizarBloqueFotos;
-    
     actualizarBandejaBorradoresUI();
 
     resolverSitioYDrive()
