@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.0 Multitarea</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.1</title>
 <script>
 (function() {
   var urls = [
@@ -48,6 +48,15 @@
   .card h2{font-size:15px;margin:0 0 4px;color:var(--azul-osc);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
   .card .subtitulo-bloque{font-size:13px;color:#7c8a94;margin-bottom:14px;font-weight:500;}
   
+  /* ESTILOS DE LA NUEVA BANDEJA DE BORRADORES */
+  .contenedor-borradores {display: flex; flex-direction: column; gap: 8px; margin-top: 10px;}
+  .item-borrador-btn {display: flex; align-items: center; justify-content: space-between; background: #eef7fc; border: 1px solid #bce1f4; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; width: 100%; transition: background 0.2s;}
+  .item-borrador-btn:hover {background: #dcf0fa;}
+  .borrador-info {flex: 1;}
+  .borrador-sitio {font-size: 14px; font-weight: 700; color: var(--azul-osc);}
+  .borrador-meta {font-size: 12px; color: #5a6b76; margin-top: 2px;}
+  .badge-conteo {background: var(--naranja); color: white; font-size: 11px; font-weight: bold; padding: 3px 8px; border-radius: 12px; margin-left: 8px;}
+
   label{display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--texto);}
   select,input[type=text],input[type=date],textarea{width:100%;padding:13px 12px;font-size:16px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:14px;background:#fff;color:var(--texto);font-family:inherit;}
   select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
@@ -127,6 +136,15 @@
   </header>
   
   <main id="vistaCampo">
+    <!-- NUEVA SECCIÓN VISUAL: ACCESO RÁPIDO A TRABAJOS EN PARALELO -->
+    <div class="card id="cardBandejaBorradores">
+      <h2>Trabajos iniciados (Borradores en Campo)</h2>
+      <div class="subtitulo-bloque">Toca una estación para reanudarla sin volver a rellenar los datos:</div>
+      <div id="bandejaBorradoresList" class="contenedor-borradores">
+        <div style="font-style:italic; color:#7c8a94; font-size:13px;">No hay inspecciones en paralelo iniciadas en este dispositivo.</div>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Ubicación de trabajo</h2>
       <label for="selCliente">Cliente</label>
@@ -227,13 +245,13 @@ var ITEMS_FOTOS_PLANTILLA = [
   "Foto de la conexión y termoencogible cable de tierra"
 ];
 
-// === INFRAESTRUCTURA MOTOR DE CACHÉ INDEXEDDB PARA MULTITAREA SIN DESBORDAR MEMORIA ===
 var dbInspecciones = null;
 var ultimaEstacionSeleccionada = "";
+var bloqueadorEventosDropdowns = false; // Bandera para evitar bucles durante la autoregeneración
 
 function inicializarBaseDatosMultitarea() {
   return new Promise(function(resolve, reject) {
-    var request = indexedDB.open("SITOC_Cache_Multitarea", 1);
+    var request = indexedDB.open("SITOC_Cache_BandejaBorradores", 1);
     request.onupgradeneeded = function(e) {
       var db = e.target.result;
       if (!db.objectStoreNames.contains("borradores_estaciones")) {
@@ -241,16 +259,17 @@ function inicializarBaseDatosMultitarea() {
       }
     };
     request.onsuccess = function(e) { dbInspecciones = e.target.result; resolve(); };
-    request.onerror = function(e) { console.error("Error IndexedDB:", e); reject(e); };
+    request.onerror = function(e) { reject(e); };
   });
 }
 
 function guardarBorradorLocalEnBaseDatos(idSitio, datosEstructura, notasGenerales) {
-  if (!dbInspecciones || !idSitio || idSitio.includes("SITIO")) return;
+  if (!dbInspecciones || !idSitio || idSitio.includes("SITIO") || bloqueadorEventosDropdowns) return;
   var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
   var almacen = transaccion.objectStore("borradores_estaciones");
   
-  // Clonamos la estructura extrayendo los binarios crudos para guardarlos de forma compacta
+  var parts = idSitio.split("___");
+  
   var mapeoEstructuraLimpia = datosEstructura.map(function(item) {
     return {
       item: item.item,
@@ -261,38 +280,114 @@ function guardarBorradorLocalEnBaseDatos(idSitio, datosEstructura, notasGenerale
     };
   });
 
-  almacen.put({ idSitio: idSitio, estructura: mapeoEstructuraLimpia, notas: notasGenerales, timestamp: Date.now() });
+  almacen.put({ 
+    idSitio: idSitio, 
+    cliente: parts[0] ? parts[0].replace(/_/g, " ") : "",
+    proyecto: parts[1] ? parts[1].replace(/_/g, " ") : "",
+    actividad: parts[2] ? parts[2].replace(/_/g, " ") : "",
+    estacion: parts[3] ? parts[3].replace(/_/g, " ") : "",
+    estructura: mapeoEstructuraLimpia, 
+    notas: notasGenerales, 
+    timestamp: Date.now() 
+  });
+  transaccion.oncomplete = function() { actualizarBandejaBorradoresUI(); };
 }
 
-function recuperarBorradorLocalDeBaseDatos(idSitio) {
-  return new Promise(function(resolve) {
-    if (!dbInspecciones || !idSitio) return resolve(null);
-    var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
-    var almacen = transaccion.objectStore("borradores_estaciones");
-    var query = almacen.get(idSitio);
-    query.onsuccess = function(e) {
-      if (e.target.result) {
-        // Reconstruimos los ObjectURLs temporales para las miniaturas en vivo
-        var datosReconstruidos = e.target.result.estructura.map(function(item) {
-          return {
-            item: item.item,
-            estado: item.estado,
-            fotosList: item.fotosList.map(function(foto) {
-              return { file: foto.fileBlob, previewUrl: URL.createObjectURL(foto.fileBlob), subido: foto.subido, filename: foto.filename };
-            })
-          };
-        });
-        resolve({ estructura: datosReconstruidos, notas: e.target.result.notes || e.target.result.notas });
-      } else { resolve(null); }
-    };
-    query.onerror = function() { resolve(null); };
-  });
+function actualizarBandejaBorradoresUI() {
+  if (!dbInspecciones) return;
+  var contenedor = document.getElementById("bandejaBorradoresList");
+  var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
+  var almacen = transaccion.objectStore("borradores_estaciones");
+  var cursorReq = almacen.openCursor(null, "prev");
+  
+  var html = "";
+  var contador = 0;
+  
+  cursorReq.onsuccess = function(e) {
+    var cursor = e.target.result;
+    if (cursor) {
+      contador++;
+      var d = cursor.value;
+      var totalFotos = 0;
+      d.estructura.forEach(function(i) { totalFotos += i.fotosList.length; });
+      
+      html += `
+        <button class="item-borrador-btn" type="button" onclick="cargarBorradorEspecificoClick('${d.idSitio}')">
+          <div class="borrador-info">
+            <div class="borrador-sitio">📍 Estación: ${d.estacion}</div>
+            <div class="borrador-meta">${d.cliente} &bull; ${d.proyecto} &bull; ${d.actividad}</div>
+          </div>
+          <span class="badge-conteo">${totalFotos} Fotos</span>
+        </button>
+      `;
+      cursor.continue();
+    } else {
+      if (contador === 0) {
+        contenedor.innerHTML = '<div style="font-style:italic; color:#7c8a94; font-size:13px;">No hay inspecciones en paralelo iniciadas en este dispositivo.</div>';
+      } else {
+        contenedor.innerHTML = html;
+      }
+    }
+  };
 }
+
+window.cargarBorradorEspecificoClick = function(idSitio) {
+  if (!dbInspecciones || !idSitio) return;
+  bloqueadorEventosDropdowns = true; 
+  
+  var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
+  var almacen = transaccion.objectStore("borradores_estaciones");
+  
+  almacen.get(idSitio).onsuccess = function(e) {
+    var res = e.target.result;
+    if (res) {
+      // 1. Rellenar los dropdowns visuales saltándonos las re-evaluaciones mecánicas
+      var selCliente = document.getElementById("selCliente");
+      var selProyecto = document.getElementById("selProyecto");
+      var selActividad = document.getElementById("selActividad");
+      var selEstacion = document.getElementById("selEstacion");
+
+      selCliente.value = res.cliente;
+      
+      // Regeneramos mecánicamente el árbol hijo del cliente
+      var pList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente; }).map(function(f) { return f.proyecto; }));
+      selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>' + pList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
+      selProyecto.value = res.proyecto; selProyecto.disabled = false;
+
+      var aList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente && f.proyecto === res.proyecto; }).map(function(f) { return f.actividad; }));
+      selActividad.innerHTML = '<option value="">Selecciona una actividad</option>' + aList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
+      selActividad.value = res.actividad; selActividad.disabled = false;
+
+      var eList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente && f.proyecto === res.proyecto && f.actividad === res.actividad; }).map(function(f) { return f.estacion; }));
+      selEstacion.innerHTML = '<option value="">Selecciona una estación</option>' + eList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
+      selEstacion.value = res.estacion; selEstacion.disabled = false;
+
+      document.getElementById("inpNotas").value = res.notas || "";
+      ultimaEstacionSeleccionada = idSitio;
+
+      // 2. Reconstruir los blobs visuales de las fotos adjuntas
+      estructuraFotos = res.estructura.map(function(item) {
+        return {
+          item: item.item,
+          estado: item.estado,
+          fotosList: item.fotosList.map(function(foto) {
+            return { file: foto.fileBlob, previewUrl: URL.createObjectURL(foto.fileBlob), subido: foto.subido, filename: foto.filename };
+          })
+        };
+      });
+
+      renderizarBloqueFotos();
+      bloqueadorEventosDropdowns = false;
+      alert("¡Estación cargada! Puedes continuar registrando los datos.");
+    }
+  };
+};
 
 function eliminarBorradorDeBaseDatos(idSitio) {
   if (!dbInspecciones || !idSitio) return;
   var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
   transaccion.objectStore("borradores_estaciones").delete(idSitio);
+  transaccion.oncomplete = function() { actualizarBandejaBorradoresUI(); };
 }
 
 function procesarCSVNativo(textoPlano) {
@@ -408,6 +503,7 @@ function iniciarApp() {
 
     estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
     renderizarBloqueFotos();
+    actualizarBandejaBorradoresUI();
 
     resolverSitioYDrive()
       .then(descargarYLeerConfiguracion)
@@ -450,15 +546,17 @@ function iniciarApp() {
   var selCliente = document.getElementById("selCliente"); var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad"); var selEstacion = document.getElementById("selEstacion");
 
-  // DISPARADOR GESTIÓN MULTITAREA: Guarda el sitio viejo antes de cargar las listas del nuevo
   function gestionarCambioDeEstacionProactivo() {
+    if (bloqueadorEventosDropdowns) return;
+    
+    // Si ya teníamos cargada una estación con datos locales, hacemos respaldo preventivo
     if (ultimaEstacionSeleccionada && estructuraFotos.some(function(i){return i.fotosList.length > 0 || i.estado === "NA";})) {
       guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
     }
     
     var c = selCliente.value, p = selProyecto.value, a = selActividad.value, e = selEstacion.value;
     if (c && p && a && e) {
-      var idLlaveSitioActual = (c + "_" + p + "_" + a + "_" + e).replace(/\s+/g, "_");
+      var idLlaveSitioActual = (c + "___" + p + "___" + a + "___" + e).replace(/\s+/g, "_");
       ultimaEstacionSeleccionada = idLlaveSitioActual;
       
       recuperarBorradorLocalDeBaseDatos(idLlaveSitioActual).then(function(borrador) {
@@ -475,6 +573,7 @@ function iniciarApp() {
   }
 
   selCliente.addEventListener("change", function() {
+    if (bloqueadorEventosDropdowns) return;
     var c = selCliente.value; selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
     selActividad.disabled = selEstacion.disabled = true; if (!c) { selProyecto.disabled = true; return; }
     var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
@@ -484,6 +583,7 @@ function iniciarApp() {
   });
 
   selProyecto.addEventListener("change", function() {
+    if (bloqueadorEventosDropdowns) return;
     var c = selCliente.value, p = selProyecto.value; selActividad.innerHTML = '<option value="">Selecciona una actividad</option>';
     selEstacion.disabled = true; if (!p) { selActividad.disabled = true; return; }
     var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
@@ -493,6 +593,7 @@ function iniciarApp() {
   });
 
   selActividad.addEventListener("change", function() {
+    if (bloqueadorEventosDropdowns) return;
     var c = selCliente.value, p = selProyecto.value, a = selActividad.value; selEstacion.innerHTML = '<option value="">Selecciona una estación</option>';
     if (!a) { selEstacion.disabled = true; return; }
     var e = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
@@ -746,7 +847,6 @@ function iniciarApp() {
       }).then(function(j) { 
         return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); 
       }).then(function() {
-        // Al enviar con éxito, limpiamos este borrador específico de la caché del celular
         eliminarBorradorDeBaseDatos(ultimaEstacionSeleccionada);
         ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
         document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada con éxito. Reporte fotográfico sincronizado.";
@@ -797,7 +897,7 @@ function iniciarApp() {
     return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
   }
 
-  // INTERFAZ SUPERVISOR EN TIEMPO REAL
+  // INTERFAZ SUPERVISOR
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
@@ -865,7 +965,7 @@ function iniciarApp() {
             var meta = document.createElement("div"); meta.className = "meta";
             meta.textContent = archivo.name.replace(/_/g, " ").replace(".jpg", "");
 
-            var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑 Rechazar / Eliminar";
+            var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑  Rechazar / Eliminar";
             btnR.addEventListener("click", function() {
               if (confirm("¿Deseas eliminar esta foto de SharePoint?")) {
                 fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) {
