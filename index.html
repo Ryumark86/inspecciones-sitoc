@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4.2</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4.3</title>
 <script>
 (function() {
   var urls = [
@@ -262,7 +262,7 @@ function iniciarApp() {
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
   var cuentaActual = null; var siteId = null; var driveId = null;
   var datosConfiguracion = []; var msalInicializado = false;
-  var estructuraFotos = []; var ubicacionCapturada = null;
+  var estructuraFotos = []; var ubicacionCaptured = null;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
   msalInstance.initialize().then(function() {
@@ -332,8 +332,8 @@ function iniciarApp() {
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function(pos) {
-        ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
-        document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
+        ubicacionCaptured = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
+        document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCaptured;
         document.getElementById("gpsStatusBar").classList.add("gps-success");
       }, null, { enableHighAccuracy: true });
     }
@@ -478,16 +478,15 @@ function iniciarApp() {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado];
       itemActual.estado = "TOMADA";
-      var est = selEstacion.value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
+      var est = selEstacion.value || "SITIO GENERAL", g = ubicacionCaptured || "Sin GPS", h = new Date().toLocaleString();
       
       files.forEach(function(f) {
         procesandoMarcasDeAgua++;
-        estamparMarcaDeAgua(f, g, est, h, function(b, base64Data) {
+        estamparMarcaDeAgua(f, g, est, h, function(b) {
           if (b) {
             itemActual.fotosList.push({ 
               file: b, 
               previewUrl: URL.createObjectURL(b), 
-              base64String: base64Data, // Texto Base64 limpio obtenido de FileReader
               subido: false, 
               filename: "" 
             });
@@ -533,14 +532,7 @@ function iniciarApp() {
         ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
         ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
         
-        canvas.toBlob(function(b) { 
-          var readerB64 = new FileReader();
-          readerB64.readAsDataURL(b);
-          readerB64.onloadend = function() {
-            // readerB64.result entrega directamente la cadena 'data:image/jpeg;base64,...'
-            cb(b, readerB64.result); 
-          }
-        }, "image/jpeg", 0.85);
+        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.85);
       };
     };
   }
@@ -639,40 +631,28 @@ function iniciarApp() {
       }
 
       return vaciarUltimas().then(function() {
-        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + "/fotos:/children", { headers: { Authorization: "Bearer " + token } })
-          .then(function(r) { return r.ok ? r.json() : { value: [] }; });
-      }).then(function(resFotosNube) {
-        // CORRECCIÓN FIX: Mapeamos la lista asegurando extraer la propiedad de texto plano .base64String
-        var fotosCompiladas = (resFotosNube.value || []).map(function(fotoNube) {
-          var stringBase64Encontrado = null;
-          estructuraFotos.forEach(function(item) {
-            item.fotosList.forEach(function(fObj) {
-              if (fObj.filename === fotoNube.name) {
-                stringBase64Encontrado = fObj.base64String; 
-              }
-            });
-          });
-          fotoNube.base64StringEmbed = stringBase64Encontrado; 
-          return fotoNube;
-        });
-
-        var blobExcelFotos = construirReporteExcelFotos(d.estacion, fotosCompiladas);
+        // SOLUCIÓN DEFINITIVA DE PERMISOS: Usamos el enlace estático nativo organizativo de SharePoint
+        // Formato: https://sitoc.sharepoint.com/sites/INSPECCIONES_EPCC/Inspecciones/...
+        var baseRutaSharePoint = "https://" + CONFIG.hostname + CONFIG.sitePath + "/" + rb + "/fotos/";
+        var blobExcelFotos = construirReporteExcelFotos(d.estacion, estructuraFotos, baseRutaSharePoint);
+        
         return subirArchivo(token, rb + "/reporte_fotografico_sitoc.xls", blobExcelFotos);
       }).then(function() {
-        var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
+        var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCaptured || "Sin GPS");
         return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }));
       }).then(function() {
         return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb, { headers: { Authorization: "Bearer " + token } }).then(function(r){return r.json();});
       }).then(function(j) { 
-        return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); 
+        return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCaptured || "Sin GPS", linkCarpeta: j.webUrl || "" }); 
       }).then(function() {
         ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada. Se creó el archivo de Excel unificado compatible con la visualización Web y de Escritorio de Office 365.";
+        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada con éxito. Reporte fotográfico sincronizado.";
       });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  function construirReporteExcelFotos(nombreEstacion, listaFotos) {
+  // === REPRODUCTOR DE TABLA DE EXCEL CON ENLACES INTERNOS NATIVOS ===
+  function construirReporteExcelFotos(nombreEstacion, listaItemsFormulario, urlBaseFotos) {
     var htmlExcel = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -696,24 +676,39 @@ function iniciarApp() {
             <th>REGISTRO FOTOGRÁFICO DE CAMPO</th>
           </tr>`;
 
-    if (listaFotos.length === 0) {
-      htmlExcel += `<tr><td colspan="3">No se cargaron registros fotográficos en esta inspección.</td></tr>`;
-    } else {
-      listaFotos.forEach(function(foto) {
-        var nombreLimpio = foto.name.replace(/_/g, " ").replace(".jpg", "").toUpperCase();
-        
-        // CORRECCIÓN CLAVE: fuenteImagen ahora recibe la cadena de texto Base64 pura (comenzando por data:image...)
-        // o recurre al link de Graph. Eliminamos el error de inyección de objetos [object Object]
-        var fuenteImagen = foto.base64StringEmbed || foto["@microsoft.graph.downloadUrl"] || "";
-
+    listaItemsFormulario.forEach(function(item) {
+      var nombreLimpio = item.item.toUpperCase();
+      if (item.estado === "NA") {
         htmlExcel += `
           <tr>
             <td class="item-label">${nombreLimpio}</td>
-            <td class="meta-label">APROBADO / SINCRONIZADO</td>
-            <td><img src="${fuenteImagen}" class="celda-imagen" width="160" height="120"></td>
+            <td class="meta-label" style="color:#c0392b;">NO APLICA</td>
+            <td style="color:#7f8c8d; font-style:italic;">Excluido por el técnico</td>
           </tr>`;
-      });
-    }
+      } else if (item.fotosList.length === 0) {
+        htmlExcel += `
+          <tr>
+            <td class="item-label">${nombreLimpio}</td>
+            <td class="meta-label" style="color:#7c8a94;">PENDIENTE</td>
+            <td style="color:#7c8a94; font-style:italic;">Sin registro de captura</td>
+          </tr>`;
+      } else {
+        item.fotosList.forEach(function(fObj, idx) {
+          var nombreArchivoCreado = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
+          
+          // MAPEO CLAVE: Al usar la dirección del dominio local de SITOC en SharePoint, Excel Online
+          // lo cargará al instante porque comparte el mismo token de identidad organizativa.
+          var linkRealNativoSharePoint = urlBaseFotos + nombreArchivoCreado;
+
+          htmlExcel += `
+            <tr>
+              <td class="item-label">${nombreLimpio} ${(item.fotosList.length > 1 ? '('+(idx+1)+')' : '')}</td>
+              <td class="meta-label" style="color:#2e7d4f;">APROBADO / EN NUBE</td>
+              <td><img src="${linkRealNativoSharePoint}" class="celda-imagen" width="160" height="120"></td>
+            </tr>`;
+        });
+      }
+    });
 
     htmlExcel += `</table></body></html>`;
     return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
