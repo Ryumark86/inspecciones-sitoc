@@ -73,9 +73,10 @@
   .status-na {color: #7f8c8d;}
   .status-subida {color: #2980b9;}
   
-  .foto-item-actions-layout {display: flex; gap: 6px;}
-  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
-  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px;}
+  .foto-item-actions-layout {display: flex; gap: 4px;}
+  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
+  .btn-accion-galeria {background: var(--indigo); color: #fff; border: none; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
+  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 8px; border-radius: 6px; font-size: 12px;}
 
   .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
   .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
@@ -180,7 +181,8 @@
   </main>
 </div>
 
-<input type="file" id="inputCapturaUnificado" accept="image/*" multiple>
+<input type="file" id="inputCamaraDirecta" accept="image/*" capture="environment">
+<input type="file" id="inputGaleriaDirecta" accept="image/*" multiple>
 
 <div id="modalVisorGrande" class="oculto">
   <img id="imgVisorGrandeTarget" src="" alt="Vista Previa">
@@ -243,7 +245,6 @@ function procesarCSVNativo(textoPlano) {
 }
 
 function iniciarApp() {
-  // === CONFIGURACIÓN DE MSAL OPTIMIZADA MULTI-USUARIO (POPUP FIX) ===
   var msalConfig = {
     auth: { 
       clientId: CONFIG.clientId, 
@@ -278,7 +279,6 @@ function iniciarApp() {
     document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
 
-  // LOGÍN POR POPUP SEGURO EN MÓVILES Y COMPUTADORES
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (msalInicializado) {
       msalInstance.loginPopup({ scopes: SCOPES })
@@ -423,16 +423,25 @@ function iniciarApp() {
       info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
 
       var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
-      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Añadir";
+      
+      // BOTÓN 1: Activa la cámara de forma directa e inmediata
+      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Cámara";
       bF.addEventListener("click", function() { 
         indiceItemSeleccionado = idx; 
-        document.getElementById("inputCapturaUnificado").click();
+        document.getElementById("inputCamaraDirecta").click();
+      });
+      
+      // BOTÓN 2: Abre el carrete o galería directamente
+      var bG = document.createElement("button"); bG.type = "button"; bG.className = "btn-accion-galeria"; bG.textContent = "📁 Galería";
+      bG.addEventListener("click", function() {
+        indiceItemSeleccionado = idx;
+        document.getElementById("inputGaleriaDirecta").click();
       });
       
       var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
       bN.addEventListener("click", function() { estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotos(); });
       
-      acts.appendChild(bF); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
+      acts.appendChild(bF); acts.appendChild(bG); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
 
       if (foto.fotosList.length > 0) {
         var tc = document.createElement("div"); tc.className = "thumbs-container";
@@ -467,9 +476,10 @@ function iniciarApp() {
   }
   document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
 
-  document.getElementById("inputCapturaUnificado").addEventListener("change", function(e) {
-    if (e.target.files.length > 0 && indiceItemSeleccionado !== null) {
-      var files = Array.from(e.target.files); var itemActual = estructuraFotos[indiceItemSeleccionado];
+  // MANEJO PROCESO DE CAPTURA - FUNCIÓN COMPARTIDA PARA PROCESAR IMÁGENES
+  function procesarArchivosCargados(files) {
+    if (files.length > 0 && indiceItemSeleccionado !== null) {
+      var itemActual = estructuraFotos[indiceItemSeleccionado];
       itemActual.estado = "TOMADA";
       var est = selEstacion.value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
       
@@ -481,6 +491,15 @@ function iniciarApp() {
         });
       });
     }
+  }
+
+  document.getElementById("inputCamaraDirecta").addEventListener("change", function(e) {
+    procesarArchivosCargados(Array.from(e.target.files));
+    e.target.value = "";
+  });
+
+  document.getElementById("inputGaleriaDirecta").addEventListener("change", function(e) {
+    procesarArchivosCargados(Array.from(e.target.files));
     e.target.value = "";
   });
 
@@ -773,7 +792,7 @@ function esperarMSAL(intentos) {
   if (typeof msal !== "undefined") { iniciarApp(); }
   else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
 }
-window.location.hash = ""; // Limpia fragmentos raros de redirecciones previas
+window.location.hash = "";
 window.addEventListener("load", function() { esperarMSAL(25); });
 </script>
 </body>
