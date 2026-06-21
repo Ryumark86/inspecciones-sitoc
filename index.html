@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4.1</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4.2</title>
 <script>
 (function() {
   var urls = [
@@ -487,7 +487,7 @@ function iniciarApp() {
             itemActual.fotosList.push({ 
               file: b, 
               previewUrl: URL.createObjectURL(b), 
-              base64String: base64Data, // Almacenamos el texto plano Base64 para el Excel
+              base64String: base64Data, // Texto Base64 limpio obtenido de FileReader
               subido: false, 
               filename: "" 
             });
@@ -533,11 +533,11 @@ function iniciarApp() {
         ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
         ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
         
-        // Retornamos el blob comprimido y su representación en texto Base64
         canvas.toBlob(function(b) { 
           var readerB64 = new FileReader();
           readerB64.readAsDataURL(b);
           readerB64.onloadend = function() {
+            // readerB64.result entrega directamente la cadena 'data:image/jpeg;base64,...'
             cb(b, readerB64.result); 
           }
         }, "image/jpeg", 0.85);
@@ -642,12 +642,14 @@ function iniciarApp() {
         return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + "/fotos:/children", { headers: { Authorization: "Bearer " + token } })
           .then(function(r) { return r.ok ? r.json() : { value: [] }; });
       }).then(function(resFotosNube) {
-        // SOLUCIÓN COMPATIBILIDAD ONLINE: Inyectamos el string Base64 local que ya posee la app en memoria
+        // CORRECCIÓN FIX: Mapeamos la lista asegurando extraer la propiedad de texto plano .base64String
         var fotosCompiladas = (resFotosNube.value || []).map(function(fotoNube) {
           var stringBase64Encontrado = null;
           estructuraFotos.forEach(function(item) {
             item.fotosList.forEach(function(fObj) {
-              if (fObj.filename === fotoNube.name) stringBase64Encontrado = fObj.base64String;
+              if (fObj.filename === fotoNube.name) {
+                stringBase64Encontrado = fObj.base64String; 
+              }
             });
           });
           fotoNube.base64StringEmbed = stringBase64Encontrado; 
@@ -670,7 +672,6 @@ function iniciarApp() {
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  // === CONSTRUCTOR DE EXCEL CON CARGA INTELIGENTE MULTI-ENTORNO (DESKTOP + WEB FIX) ===
   function construirReporteExcelFotos(nombreEstacion, listaFotos) {
     var htmlExcel = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -701,9 +702,9 @@ function iniciarApp() {
       listaFotos.forEach(function(foto) {
         var nombreLimpio = foto.name.replace(/_/g, " ").replace(".jpg", "").toUpperCase();
         
-        // ESTRATEGIA INTEGRADA: Si está disponible el texto Base64, lo incrustamos directo (Garantiza ver la foto en Excel Web).
-        // Si por alguna razón es una sincronización antigua sin caché, el Excel de Escritorio resolverá la URL de Graph.
-        var fuenteImagen = foto.base64StringEmbed || foto["@microsoft.graph.downloadUrl"];
+        // CORRECCIÓN CLAVE: fuenteImagen ahora recibe la cadena de texto Base64 pura (comenzando por data:image...)
+        // o recurre al link de Graph. Eliminamos el error de inyección de objetos [object Object]
+        var fuenteImagen = foto.base64StringEmbed || foto["@microsoft.graph.downloadUrl"] || "";
 
         htmlExcel += `
           <tr>
