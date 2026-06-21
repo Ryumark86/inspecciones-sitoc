@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.0 Multitarea</title>
 <script>
 (function() {
   var urls = [
@@ -227,6 +227,74 @@ var ITEMS_FOTOS_PLANTILLA = [
   "Foto de la conexión y termoencogible cable de tierra"
 ];
 
+// === INFRAESTRUCTURA MOTOR DE CACHÉ INDEXEDDB PARA MULTITAREA SIN DESBORDAR MEMORIA ===
+var dbInspecciones = null;
+var ultimaEstacionSeleccionada = "";
+
+function inicializarBaseDatosMultitarea() {
+  return new Promise(function(resolve, reject) {
+    var request = indexedDB.open("SITOC_Cache_Multitarea", 1);
+    request.onupgradeneeded = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains("borradores_estaciones")) {
+        db.createObjectStore("borradores_estaciones", { keyPath: "idSitio" });
+      }
+    };
+    request.onsuccess = function(e) { dbInspecciones = e.target.result; resolve(); };
+    request.onerror = function(e) { console.error("Error IndexedDB:", e); reject(e); };
+  });
+}
+
+function guardarBorradorLocalEnBaseDatos(idSitio, datosEstructura, notasGenerales) {
+  if (!dbInspecciones || !idSitio || idSitio.includes("SITIO")) return;
+  var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
+  var almacen = transaccion.objectStore("borradores_estaciones");
+  
+  // Clonamos la estructura extrayendo los binarios crudos para guardarlos de forma compacta
+  var mapeoEstructuraLimpia = datosEstructura.map(function(item) {
+    return {
+      item: item.item,
+      estado: item.estado,
+      fotosList: item.fotosList.map(function(foto) {
+        return { fileBlob: foto.file, filename: foto.filename, subido: foto.subido };
+      })
+    };
+  });
+
+  almacen.put({ idSitio: idSitio, estructura: mapeoEstructuraLimpia, notas: notasGenerales, timestamp: Date.now() });
+}
+
+function recuperarBorradorLocalDeBaseDatos(idSitio) {
+  return new Promise(function(resolve) {
+    if (!dbInspecciones || !idSitio) return resolve(null);
+    var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
+    var almacen = transaccion.objectStore("borradores_estaciones");
+    var query = almacen.get(idSitio);
+    query.onsuccess = function(e) {
+      if (e.target.result) {
+        // Reconstruimos los ObjectURLs temporales para las miniaturas en vivo
+        var datosReconstruidos = e.target.result.estructura.map(function(item) {
+          return {
+            item: item.item,
+            estado: item.estado,
+            fotosList: item.fotosList.map(function(foto) {
+              return { file: foto.fileBlob, previewUrl: URL.createObjectURL(foto.fileBlob), subido: foto.subido, filename: foto.filename };
+            })
+          };
+        });
+        resolve({ estructura: datosReconstruidos, notas: e.target.result.notes || e.target.result.notas });
+      } else { resolve(null); }
+    };
+    query.onerror = function() { resolve(null); };
+  });
+}
+
+function eliminarBorradorDeBaseDatos(idSitio) {
+  if (!dbInspecciones || !idSitio) return;
+  var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
+  transaccion.objectStore("borradores_estaciones").delete(idSitio);
+}
+
 function procesarCSVNativo(textoPlano) {
   try {
     var lineas = textoPlano.split(/\r?\n/); var filasMapeadas = [];
@@ -270,7 +338,7 @@ function iniciarApp() {
     msalInicializado = true;
     if (cuentas.length > 0) { 
       cuentaActual = cuentas[0]; 
-      mostrarAppPrincipal(); 
+      inicializarBaseDatosMultitarea().then(mostrarAppPrincipal);
     } else { 
       document.getElementById("pantallaLogin").classList.remove("oculto"); 
     }
@@ -284,7 +352,7 @@ function iniciarApp() {
       msalInstance.loginPopup({ scopes: SCOPES })
         .then(function(respuesta) {
           cuentaActual = respuesta.account;
-          mostrarAppPrincipal();
+          inicializarBaseDatosMultitarea().then(mostrarAppPrincipal);
         })
         .catch(function(error) {
           console.error("Error en Login:", error);
@@ -382,12 +450,37 @@ function iniciarApp() {
   var selCliente = document.getElementById("selCliente"); var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad"); var selEstacion = document.getElementById("selEstacion");
 
+  // DISPARADOR GESTIÓN MULTITAREA: Guarda el sitio viejo antes de cargar las listas del nuevo
+  function gestionarCambioDeEstacionProactivo() {
+    if (ultimaEstacionSeleccionada && estructuraFotos.some(function(i){return i.fotosList.length > 0 || i.estado === "NA";})) {
+      guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+    }
+    
+    var c = selCliente.value, p = selProyecto.value, a = selActividad.value, e = selEstacion.value;
+    if (c && p && a && e) {
+      var idLlaveSitioActual = (c + "_" + p + "_" + a + "_" + e).replace(/\s+/g, "_");
+      ultimaEstacionSeleccionada = idLlaveSitioActual;
+      
+      recuperarBorradorLocalDeBaseDatos(idLlaveSitioActual).then(function(borrador) {
+        if (borrador) {
+          estructuraFotos = borrador.estructura;
+          document.getElementById("inpNotas").value = borrador.notas || "";
+        } else {
+          estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
+          document.getElementById("inpNotas").value = "";
+        }
+        renderizarBloqueFotos();
+      });
+    }
+  }
+
   selCliente.addEventListener("change", function() {
     var c = selCliente.value; selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
     selActividad.disabled = selEstacion.disabled = true; if (!c) { selProyecto.disabled = true; return; }
     var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
     selProyecto.innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     selProyecto.disabled = false;
+    gestionarCambioDeEstacionProactivo();
   });
 
   selProyecto.addEventListener("change", function() {
@@ -396,6 +489,7 @@ function iniciarApp() {
     var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
     selActividad.innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     selActividad.disabled = false;
+    gestionarCambioDeEstacionProactivo();
   });
 
   selActividad.addEventListener("change", function() {
@@ -404,7 +498,10 @@ function iniciarApp() {
     var e = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
     selEstacion.innerHTML += e.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     selEstacion.disabled = false;
+    gestionarCambioDeEstacionProactivo();
   });
+
+  selEstacion.addEventListener("change", gestionarCambioDeEstacionProactivo);
 
   function renderizarBloqueFotos() {
     var contenedor = document.getElementById("listaFotosEstructurada"); contenedor.innerHTML = "";
@@ -424,14 +521,12 @@ function iniciarApp() {
 
       var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
       
-      // BOTÓN 1: Activa la cámara de forma directa e inmediata
       var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Cámara";
       bF.addEventListener("click", function() { 
         indiceItemSeleccionado = idx; 
         document.getElementById("inputCamaraDirecta").click();
       });
       
-      // BOTÓN 2: Abre el carrete o galería directamente
       var bG = document.createElement("button"); bG.type = "button"; bG.className = "btn-accion-galeria"; bG.textContent = "📁 Galería";
       bG.addEventListener("click", function() {
         indiceItemSeleccionado = idx;
@@ -439,7 +534,11 @@ function iniciarApp() {
       });
       
       var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
-      bN.addEventListener("click", function() { estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotos(); });
+      bN.addEventListener("click", function() { 
+        estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; 
+        renderizarBloqueFotos(); 
+        guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+      });
       
       acts.appendChild(bF); acts.appendChild(bG); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
 
@@ -467,6 +566,7 @@ function iniciarApp() {
     item.fotosList.splice(fotoIdx, 1);
     if (item.fotosList.length === 0) item.estado = "PENDIENTE";
     renderizarBloqueFotos();
+    guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
   }
 
   function abrirVisorGrande(url) {
@@ -476,7 +576,6 @@ function iniciarApp() {
   }
   document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
 
-  // MANEJO PROCESO DE CAPTURA - FUNCIÓN COMPARTIDA PARA PROCESAR IMÁGENES
   function procesarArchivosCargados(files) {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado];
@@ -486,8 +585,12 @@ function iniciarApp() {
       files.forEach(function(f) {
         procesandoMarcasDeAgua++;
         estamparMarcaDeAgua(f, g, est, h, function(b) {
-          if (b) itemActual.fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" });
-          procesandoMarcasDeAgua--; renderizarBloqueFotos();
+          if (b) {
+            itemActual.fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" });
+          }
+          procesandoMarcasDeAgua--; 
+          renderizarBloqueFotos();
+          guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
         });
       });
     }
@@ -569,7 +672,12 @@ function iniciarApp() {
           el.fotoRef.subido = true; el.itemRef.estado = "SUBIDA"; i++; return secuencial();
         });
       }
-      return secuencial().then(function() { ov.classList.add("oculto"); alert("¡Fotos guardadas!"); renderizarBloqueFotos(); });
+      return secuencial().then(function() { 
+        ov.classList.add("oculto"); 
+        alert("¡Fotos guardadas!"); 
+        renderizarBloqueFotos(); 
+        guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+      });
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
 
@@ -591,6 +699,7 @@ function iniciarApp() {
             }
           });
           ov.classList.add("oculto"); alert("Sincronización terminada."); renderizarBloqueFotos();
+          guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
         });
     }).catch(function() { ov.classList.add("oculto"); });
   });
@@ -626,10 +735,8 @@ function iniciarApp() {
       }
 
       return vaciarUltimas().then(function() {
-        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + "/fotos:/children", { headers: { Authorization: "Bearer " + token } })
-          .then(function(r) { return r.ok ? r.json() : { value: [] }; });
-      }).then(function(resFotosNube) {
-        var blobExcelFotos = construirReporteExcelFotos(d.estacion, resFotosNube.value || []);
+        var baseRutaSharePoint = "https://" + CONFIG.hostname + CONFIG.sitePath + "/" + rb + "/fotos/";
+        var blobExcelFotos = construirReporteExcelFotos(d.estacion, estructuraFotos, baseRutaSharePoint);
         return subirArchivo(token, rb + "/reporte_fotografico_sitoc.xls", blobExcelFotos);
       }).then(function() {
         var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
@@ -639,13 +746,15 @@ function iniciarApp() {
       }).then(function(j) { 
         return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); 
       }).then(function() {
+        // Al enviar con éxito, limpiamos este borrador específico de la caché del celular
+        eliminarBorradorDeBaseDatos(ultimaEstacionSeleccionada);
         ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada. Se creó el archivo de Excel unificado con las fotos alineadas en columna.";
+        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada con éxito. Reporte fotográfico sincronizado.";
       });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  function construirReporteExcelFotos(nombreEstacion, listaFotos) {
+  function construirReporteExcelFotos(nombreEstacion, listaItemsFormulario, urlBaseFotos) {
     var htmlExcel = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -657,7 +766,7 @@ function iniciarApp() {
           .titulo { font-size: 18px; font-weight: bold; color: #0b3d5c; text-align: left; padding: 15px 0; }
           .item-label { font-weight: bold; text-align: left; background-color: #fcfcfc; color: #1c2b36; width: 320px; }
           .meta-label { color: #5a6b76; width: 180px; }
-          .celda-imagen { width: 180px; height: 130px; }
+          .celda-imagen { width: 160px; height: 120px; object-fit: cover; }
         </style>
       </head>
       <body>
@@ -669,24 +778,26 @@ function iniciarApp() {
             <th>REGISTRO FOTOGRÁFICO DE CAMPO</th>
           </tr>`;
 
-    if (listaFotos.length === 0) {
-      htmlExcel += `<tr><td colspan="3">No se cargaron registros fotográficos en esta inspección.</td></tr>`;
-    } else {
-      listaFotos.forEach(function(foto) {
-        var nombreLimpio = foto.name.replace(/_/g, " ").replace(".jpg", "").toUpperCase();
-        htmlExcel += `
-          <tr>
-            <td class="item-label">${nombreLimpio}</td>
-            <td class="meta-label">APROBADO / SINCRONIZADO</td>
-            <td><img src="${foto["@microsoft.graph.downloadUrl"]}" class="celda-imagen" width="160" height="120"></td>
-          </tr>`;
-      });
-    }
+    listaItemsFormulario.forEach(function(item) {
+      var nombreLimpio = item.item.toUpperCase();
+      if (item.estado === "NA") {
+        htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#c0392b;">NO APLICA</td><td style="color:#7f8c8d; font-style:italic;">Excluido por el técnico</td></tr>`;
+      } else if (item.fotosList.length === 0) {
+        htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#7c8a94;">PENDIENTE</td><td style="color:#7c8a94; font-style:italic;">Sin registro de captura</td></tr>`;
+      } else {
+        item.fotosList.forEach(function(fObj, idx) {
+          var nombreArchivoCreado = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
+          var linkRealNativoSharePoint = urlBaseFotos + nombreArchivoCreado;
+          htmlExcel += `<tr><td class="item-label">${nombreLimpio} ${(item.fotosList.length > 1 ? '('+(idx+1)+')' : '')}</td><td class="meta-label" style="color:#2e7d4f;">APROBADO / EN NUBE</td><td><img src="${linkRealNativoSharePoint}" class="celda-imagen" width="160" height="120"></td></tr>`;
+        });
+      }
+    });
 
     htmlExcel += `</table></body></html>`;
     return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
   }
 
+  // INTERFAZ SUPERVISOR EN TIEMPO REAL
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
@@ -729,9 +840,7 @@ function iniciarApp() {
           });
           return Promise.all(promesasProyectos);
         })
-        .then(function() {
-          ov.classList.add("oculto"); alert("Rastreo en tiempo real terminado.");
-        });
+        .then(function() { ov.classList.add("oculto"); alert("Rastreo en tiempo real terminado."); });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
@@ -797,3 +906,4 @@ window.addEventListener("load", function() { esperarMSAL(25); });
 </script>
 </body>
 </html>
+
