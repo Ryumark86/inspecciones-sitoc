@@ -243,13 +243,18 @@ function procesarCSVNativo(textoPlano) {
 }
 
 function iniciarApp() {
+  // === CONFIGURACIÓN DE MSAL OPTIMIZADA MULTI-USUARIO (POPUP FIX) ===
   var msalConfig = {
     auth: { 
       clientId: CONFIG.clientId, 
-      authority: "https://login.microsoftonline.com/common", // Soporte multi-usuario personal/corporativo
-      redirectUri: CONFIG.redirectUri 
+      authority: "https://login.microsoftonline.com/common", 
+      redirectUri: CONFIG.redirectUri,
+      validateAuthority: false
     },
-    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
+    cache: { 
+      cacheLocation: "localStorage", 
+      storeAuthStateInCookie: true
+    }
   };
 
   var msalInstance = new msal.PublicClientApplication(msalConfig);
@@ -260,18 +265,42 @@ function iniciarApp() {
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
   msalInstance.initialize().then(function() {
-    return msalInstance.handleRedirectPromise();
-  }).then(function() {
-    msalInicializado = true;
     var cuentas = msalInstance.getAllAccounts();
-    if (cuentas.length > 0) { cuentaActual = cuentas[0]; mostrarAppPrincipal(); } 
-    else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
-  }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
-
-  document.getElementById("btnLogin").addEventListener("click", function() {
-    if (msalInicializado) msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
+    msalInicializado = true;
+    if (cuentas.length > 0) { 
+      cuentaActual = cuentas[0]; 
+      mostrarAppPrincipal(); 
+    } else { 
+      document.getElementById("pantallaLogin").classList.remove("oculto"); 
+    }
+  }).catch(function(e) { 
+    console.error("Error inicializando MSAL:", e);
+    document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
-  document.getElementById("btnLogout").addEventListener("click", function() { msalInstance.logoutRedirect(); });
+
+  // LOGÍN POR POPUP SEGURO EN MÓVILES Y COMPUTADORES
+  document.getElementById("btnLogin").addEventListener("click", function() {
+    if (msalInicializado) {
+      msalInstance.loginPopup({ scopes: SCOPES })
+        .then(function(respuesta) {
+          cuentaActual = respuesta.account;
+          mostrarAppPrincipal();
+        })
+        .catch(function(error) {
+          console.error("Error en Login:", error);
+          alert("Error al iniciar sesión: " + error.message);
+        });
+    }
+  });
+
+  document.getElementById("btnLogout").addEventListener("click", function() { 
+    msalInstance.logoutPopup({
+      account: msalInstance.getActiveAccount() || cuentaActual,
+      onRedirectNavigate: function() { return false; }
+    }).then(function() {
+      window.location.reload();
+    });
+  });
 
   document.getElementById("navCampo").addEventListener("click", function() {
     document.getElementById("navCampo").classList.add("btn-nav-active");
@@ -292,7 +321,7 @@ function iniciarApp() {
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { return r.accessToken; })
-      .catch(function() { return msalInstance.acquireTokenRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri }); });
+      .catch(function() { return msalInstance.acquireTokenPopup({ scopes: SCOPES }); });
   }
 
   function mostrarAppPrincipal() {
@@ -455,7 +484,6 @@ function iniciarApp() {
     e.target.value = "";
   });
 
-  // === MARCA DE AGUA COMPRIMIDA A RESOLUCIÓN FULL HD (1080p) ===
   function estamparMarcaDeAgua(f, c, e, h, cb) {
     var r = new FileReader(); r.readAsDataURL(f);
     r.onload = function(ev) {
@@ -493,7 +521,6 @@ function iniciarApp() {
     return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(selEstacion.value || "SITIO") + "_" + limpiarNombre(t);
   }
 
-  // SUBIR BLOQUE A SHAREPOINT
   document.getElementById("btnGuardarBloque1").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Faltan datos de ubicación o técnico."); return; }
     var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
@@ -527,7 +554,6 @@ function iniciarApp() {
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
   });
 
-  // SINCRONIZAR CON ESCRITORIO
   document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
@@ -550,7 +576,6 @@ function iniciarApp() {
     }).catch(function() { ov.classList.add("oculto"); });
   });
 
-  // FINALIZAR INSPECCIÓN COMPLETA
   document.getElementById("btnEnviar").addEventListener("click", function() {
     if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete los campos."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
@@ -559,7 +584,6 @@ function iniciarApp() {
     var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim() };
 
     obtenerToken().then(function(token) {
-      // 1. Validamos si hay fotos locales de última hora sin guardar
       var subidasPendientes = [];
       estructuraFotos.forEach(function(item) {
         if (item.estado === "TOMADA") {
@@ -583,15 +607,12 @@ function iniciarApp() {
       }
 
       return vaciarUltimas().then(function() {
-        // 2. Traer el listado definitivo de fotos arriba para armar el Excel dinámico con imágenes
         return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + "/fotos:/children", { headers: { Authorization: "Bearer " + token } })
           .then(function(r) { return r.ok ? r.json() : { value: [] }; });
       }).then(function(resFotosNube) {
-        // 3. Compilar y subir el Excel Automatizado con fotos incrustadas en una sola columna
         var blobExcelFotos = construirReporteExcelFotos(d.estacion, resFotosNube.value || []);
         return subirArchivo(token, rb + "/reporte_fotografico_sitoc.xls", blobExcelFotos);
       }).then(function() {
-        // 4. Generar el index indexado plano
         var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
         return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }));
       }).then(function() {
@@ -605,7 +626,6 @@ function iniciarApp() {
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  // === NUEVA FUNCIÓN: CONSTRUCTOR DE EXCEL AUTOMÁTICO CON FOTOS EN COLUMNA ===
   function construirReporteExcelFotos(nombreEstacion, listaFotos) {
     var htmlExcel = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -648,7 +668,6 @@ function iniciarApp() {
     return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
   }
 
-  // INTERFAZ SUPERVISOR EN TIEMPO REAL REALTIME
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
@@ -754,6 +773,7 @@ function esperarMSAL(intentos) {
   if (typeof msal !== "undefined") { iniciarApp(); }
   else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
 }
+window.location.hash = ""; // Limpia fragmentos raros de redirecciones previas
 window.addEventListener("load", function() { esperarMSAL(25); });
 </script>
 </body>
