@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4.1</title>
 <script>
 (function() {
   var urls = [
@@ -424,14 +424,12 @@ function iniciarApp() {
 
       var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
       
-      // BOTÓN 1: Activa la cámara de forma directa e inmediata
       var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Cámara";
       bF.addEventListener("click", function() { 
         indiceItemSeleccionado = idx; 
         document.getElementById("inputCamaraDirecta").click();
       });
       
-      // BOTÓN 2: Abre el carrete o galería directamente
       var bG = document.createElement("button"); bG.type = "button"; bG.className = "btn-accion-galeria"; bG.textContent = "📁 Galería";
       bG.addEventListener("click", function() {
         indiceItemSeleccionado = idx;
@@ -476,7 +474,6 @@ function iniciarApp() {
   }
   document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
 
-  // MANEJO PROCESO DE CAPTURA - FUNCIÓN COMPARTIDA PARA PROCESAR IMÁGENES
   function procesarArchivosCargados(files) {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado];
@@ -485,8 +482,16 @@ function iniciarApp() {
       
       files.forEach(function(f) {
         procesandoMarcasDeAgua++;
-        estamparMarcaDeAgua(f, g, est, h, function(b) {
-          if (b) itemActual.fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" });
+        estamparMarcaDeAgua(f, g, est, h, function(b, base64Data) {
+          if (b) {
+            itemActual.fotosList.push({ 
+              file: b, 
+              previewUrl: URL.createObjectURL(b), 
+              base64String: base64Data, // Almacenamos el texto plano Base64 para el Excel
+              subido: false, 
+              filename: "" 
+            });
+          }
           procesandoMarcasDeAgua--; renderizarBloqueFotos();
         });
       });
@@ -527,7 +532,15 @@ function iniciarApp() {
         ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
         ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
         ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
-        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.85);
+        
+        // Retornamos el blob comprimido y su representación en texto Base64
+        canvas.toBlob(function(b) { 
+          var readerB64 = new FileReader();
+          readerB64.readAsDataURL(b);
+          readerB64.onloadend = function() {
+            cb(b, readerB64.result); 
+          }
+        }, "image/jpeg", 0.85);
       };
     };
   }
@@ -629,7 +642,19 @@ function iniciarApp() {
         return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + "/fotos:/children", { headers: { Authorization: "Bearer " + token } })
           .then(function(r) { return r.ok ? r.json() : { value: [] }; });
       }).then(function(resFotosNube) {
-        var blobExcelFotos = construirReporteExcelFotos(d.estacion, resFotosNube.value || []);
+        // SOLUCIÓN COMPATIBILIDAD ONLINE: Inyectamos el string Base64 local que ya posee la app en memoria
+        var fotosCompiladas = (resFotosNube.value || []).map(function(fotoNube) {
+          var stringBase64Encontrado = null;
+          estructuraFotos.forEach(function(item) {
+            item.fotosList.forEach(function(fObj) {
+              if (fObj.filename === fotoNube.name) stringBase64Encontrado = fObj.base64String;
+            });
+          });
+          fotoNube.base64StringEmbed = stringBase64Encontrado; 
+          return fotoNube;
+        });
+
+        var blobExcelFotos = construirReporteExcelFotos(d.estacion, fotosCompiladas);
         return subirArchivo(token, rb + "/reporte_fotografico_sitoc.xls", blobExcelFotos);
       }).then(function() {
         var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
@@ -640,11 +665,12 @@ function iniciarApp() {
         return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); 
       }).then(function() {
         ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada. Se creó el archivo de Excel unificado con las fotos alineadas en columna.";
+        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada. Se creó el archivo de Excel unificado compatible con la visualización Web y de Escritorio de Office 365.";
       });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
+  // === CONSTRUCTOR DE EXCEL CON CARGA INTELIGENTE MULTI-ENTORNO (DESKTOP + WEB FIX) ===
   function construirReporteExcelFotos(nombreEstacion, listaFotos) {
     var htmlExcel = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -657,7 +683,7 @@ function iniciarApp() {
           .titulo { font-size: 18px; font-weight: bold; color: #0b3d5c; text-align: left; padding: 15px 0; }
           .item-label { font-weight: bold; text-align: left; background-color: #fcfcfc; color: #1c2b36; width: 320px; }
           .meta-label { color: #5a6b76; width: 180px; }
-          .celda-imagen { width: 180px; height: 130px; }
+          .celda-imagen { width: 160px; height: 120px; object-fit: cover; }
         </style>
       </head>
       <body>
@@ -674,11 +700,16 @@ function iniciarApp() {
     } else {
       listaFotos.forEach(function(foto) {
         var nombreLimpio = foto.name.replace(/_/g, " ").replace(".jpg", "").toUpperCase();
+        
+        // ESTRATEGIA INTEGRADA: Si está disponible el texto Base64, lo incrustamos directo (Garantiza ver la foto en Excel Web).
+        // Si por alguna razón es una sincronización antigua sin caché, el Excel de Escritorio resolverá la URL de Graph.
+        var fuenteImagen = foto.base64StringEmbed || foto["@microsoft.graph.downloadUrl"];
+
         htmlExcel += `
           <tr>
             <td class="item-label">${nombreLimpio}</td>
             <td class="meta-label">APROBADO / SINCRONIZADO</td>
-            <td><img src="${foto["@microsoft.graph.downloadUrl"]}" class="celda-imagen" width="160" height="120"></td>
+            <td><img src="${fuenteImagen}" class="celda-imagen" width="160" height="120"></td>
           </tr>`;
       });
     }
