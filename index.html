@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.1</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V5.3</title>
 <script>
 (function() {
   var urls = [
@@ -48,7 +48,6 @@
   .card h2{font-size:15px;margin:0 0 4px;color:var(--azul-osc);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
   .card .subtitulo-bloque{font-size:13px;color:#7c8a94;margin-bottom:14px;font-weight:500;}
   
-  /* ESTILOS DE LA NUEVA BANDEJA DE BORRADORES */
   .contenedor-borradores {display: flex; flex-direction: column; gap: 8px; margin-top: 10px;}
   .item-borrador-btn {display: flex; align-items: center; justify-content: space-between; background: #eef7fc; border: 1px solid #bce1f4; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; width: 100%; transition: background 0.2s;}
   .item-borrador-btn:hover {background: #dcf0fa;}
@@ -136,8 +135,7 @@
   </header>
   
   <main id="vistaCampo">
-    <!-- NUEVA SECCIÓN VISUAL: ACCESO RÁPIDO A TRABAJOS EN PARALELO -->
-    <div class="card id="cardBandejaBorradores">
+    <div class="card" id="cardBandejaBorradores">
       <h2>Trabajos iniciados (Borradores en Campo)</h2>
       <div class="subtitulo-bloque">Toca una estación para reanudarla sin volver a rellenar los datos:</div>
       <div id="bandejaBorradoresList" class="contenedor-borradores">
@@ -245,9 +243,37 @@ var ITEMS_FOTOS_PLANTILLA = [
   "Foto de la conexión y termoencogible cable de tierra"
 ];
 
+// VARIABLES CON ALCANCE GLOBAL CORREGIDAS
 var dbInspecciones = null;
+var datosConfiguracion = []; 
+var estructuraFotos = [];
 var ultimaEstacionSeleccionada = "";
-var bloqueadorEventosDropdowns = false; // Bandera para evitar bucles durante la autoregeneración
+var bloqueadorEventosDropdowns = false;
+
+function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
+
+// Función nativa básica para procesar el CSV sin librerías externas
+function procesarCSVNativo(texto) {
+  var lineas = texto.split(/\r?\n/);
+  var resultado = [];
+  if (lineas.length <= 1) return resultado;
+  
+  // Asumimos formato: Cliente;Proyecto;Actividad;Estacion
+  for (var i = 1; i < lineas.length; i++) {
+    var fila = lineas[i].trim();
+    if (!fila) continue;
+    var columnas = fila.split(";");
+    if (columnas.length >= 4) {
+      resultado.push({
+        cliente: columnas[0].trim(),
+        proyecto: columnas[1].trim(),
+        actividad: columnas[2].trim(),
+        estacion: columnas[3].trim()
+      });
+    }
+  }
+  return resultado;
+}
 
 function inicializarBaseDatosMultitarea() {
   return new Promise(function(resolve, reject) {
@@ -300,15 +326,12 @@ function actualizarBandejaBorradoresUI() {
   var almacen = transaccion.objectStore("borradores_estaciones");
   var cursorReq = almacen.openCursor(null, "prev");
   
-  var html = "";
-  var contador = 0;
+  var html = ""; var contador = 0;
   
   cursorReq.onsuccess = function(e) {
     var cursor = e.target.result;
     if (cursor) {
-      contador++;
-      var d = cursor.value;
-      var totalFotos = 0;
+      contador++; var d = cursor.value; var totalFotos = 0;
       d.estructura.forEach(function(i) { totalFotos += i.fotosList.length; });
       
       html += `
@@ -324,9 +347,7 @@ function actualizarBandejaBorradoresUI() {
     } else {
       if (contador === 0) {
         contenedor.innerHTML = '<div style="font-style:italic; color:#7c8a94; font-size:13px;">No hay inspecciones en paralelo iniciadas en este dispositivo.</div>';
-      } else {
-        contenedor.innerHTML = html;
-      }
+      } else { contenedor.innerHTML = html; }
     }
   };
 }
@@ -341,31 +362,41 @@ window.cargarBorradorEspecificoClick = function(idSitio) {
   almacen.get(idSitio).onsuccess = function(e) {
     var res = e.target.result;
     if (res) {
-      // 1. Rellenar los dropdowns visuales saltándonos las re-evaluaciones mecánicas
       var selCliente = document.getElementById("selCliente");
       var selProyecto = document.getElementById("selProyecto");
       var selActividad = document.getElementById("selActividad");
       var selEstacion = document.getElementById("selEstacion");
 
+      // 1. Asignamos Cliente
       selCliente.value = res.cliente;
       
-      // Regeneramos mecánicamente el árbol hijo del cliente
+      // 2. Filtramos y rellenamos Proyectos basados en el cliente del borrador
       var pList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente; }).map(function(f) { return f.proyecto; }));
       selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>' + pList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-      selProyecto.value = res.proyecto; selProyecto.disabled = false;
+      selProyecto.value = res.proyecto; 
+      selProyecto.disabled = false;
 
+      // 3. Filtramos y rellenamos Actividades
       var aList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente && f.proyecto === res.proyecto; }).map(function(f) { return f.actividad; }));
       selActividad.innerHTML = '<option value="">Selecciona una actividad</option>' + aList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-      selActividad.value = res.actividad; selActividad.disabled = false;
+      selActividad.value = res.actividad; 
+      selActividad.disabled = false;
 
+      // 4. Filtramos y rellenamos Estaciones
       var eList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente && f.proyecto === res.proyecto && f.actividad === res.actividad; }).map(function(f) { return f.estacion; }));
       selEstacion.innerHTML = '<option value="">Selecciona una estación</option>' + eList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-      selEstacion.value = res.estacion; selEstacion.disabled = false;
+      selEstacion.value = res.estacion; 
+      selEstacion.disabled = false;
 
-      document.getElementById("inpNotas").value = res.notas || "";
+      document.getElementById("inpNotas").value = res.notes || res.notas || "";
       ultimaEstacionSeleccionada = idSitio;
 
-      // 2. Reconstruir los blobs visuales de las fotos adjuntas
+      // Liberamos caché de miniaturas anteriores
+      estructuraFotos.forEach(function(item) {
+        item.fotosList.forEach(function(fObj) { if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl); });
+      });
+
+      // Mapeamos los archivos binarios recuperados creando nuevos ObjectURLs válidos
       estructuraFotos = res.estructura.map(function(item) {
         return {
           item: item.item,
@@ -376,9 +407,12 @@ window.cargarBorradorEspecificoClick = function(idSitio) {
         };
       });
 
-      renderizarBloqueFotos();
+      // Renderizamos la UI limpia de fotos
+      var renderizadoEstructuraFotos = window.actualizarInterfazFotosGlobal || function() { console.log("Pendiente iniciar UI"); };
+      renderizadoEstructuraFotos();
+      
       bloqueadorEventosDropdowns = false;
-      alert("¡Estación cargada! Puedes continuar registrando los datos.");
+      alert("¡Borrador cargado con éxito! Estación: " + res.estacion);
     }
   };
 };
@@ -388,23 +422,6 @@ function eliminarBorradorDeBaseDatos(idSitio) {
   var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
   transaccion.objectStore("borradores_estaciones").delete(idSitio);
   transaccion.oncomplete = function() { actualizarBandejaBorradoresUI(); };
-}
-
-function procesarCSVNativo(textoPlano) {
-  try {
-    var lineas = textoPlano.split(/\r?\n/); var filasMapeadas = [];
-    for (var i = 0; i < lineas.length; i++) {
-      var linea = lineas[i].trim(); if (!linea) continue;
-      var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
-      var cli = celdas[0] ? celdas[0].trim() : ""; var pro = celdas[1] ? celdas[1].trim() : "";
-      var act = celdas[2] ? celdas[2].trim() : ""; var est = celdas[3] ? celdas[3].trim() : "";
-      if (i === 0 && cli.toLowerCase().includes("client")) continue;
-      if (cli && pro) {
-        filasMapeadas.push({ cliente: cli.toUpperCase(), proyecto: pro.toUpperCase(), actividad: act ? act.toUpperCase() : "INSTALACION", estacion: est ? est.toUpperCase() : "SITIO GENERAL" });
-      }
-    }
-    return filasMapeadas;
-  } catch(e) { return []; }
 }
 
 function iniciarApp() {
@@ -424,8 +441,8 @@ function iniciarApp() {
   var msalInstance = new msal.PublicClientApplication(msalConfig);
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
   var cuentaActual = null; var siteId = null; var driveId = null;
-  var datosConfiguracion = []; var msalInicializado = false;
-  var estructuraFotos = []; var ubicacionCapturada = null;
+  var msalInicializado = false;
+  var ubicacionCapturada = null;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
   msalInstance.initialize().then(function() {
@@ -503,6 +520,10 @@ function iniciarApp() {
 
     estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
     renderizarBloqueFotos();
+    
+    // Compartimos la función con la ventana global para el re-pintado automático
+    window.actualizarInterfazFotosGlobal = renderizarBloqueFotos;
+    
     actualizarBandejaBorradoresUI();
 
     resolverSitioYDrive()
@@ -541,15 +562,22 @@ function iniciarApp() {
     });
   }
 
-  function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
-
   var selCliente = document.getElementById("selCliente"); var selProyecto = document.getElementById("selProyecto");
   var selActividad = document.getElementById("selActividad"); var selEstacion = document.getElementById("selEstacion");
+
+  function recuperarBorradorLocalDeBaseDatos(idSitio) {
+    return new Promise(function(resolve) {
+      if (!dbInspecciones) return resolve(null);
+      var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
+      transaccion.objectStore("borradores_estaciones").get(idSitio).onsuccess = function(e) {
+        resolve(e.target.result || null);
+      };
+    });
+  }
 
   function gestionarCambioDeEstacionProactivo() {
     if (bloqueadorEventosDropdowns) return;
     
-    // Si ya teníamos cargada una estación con datos locales, hacemos respaldo preventivo
     if (ultimaEstacionSeleccionada && estructuraFotos.some(function(i){return i.fotosList.length > 0 || i.estado === "NA";})) {
       guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
     }
@@ -561,7 +589,15 @@ function iniciarApp() {
       
       recuperarBorradorLocalDeBaseDatos(idLlaveSitioActual).then(function(borrador) {
         if (borrador) {
-          estructuraFotos = borrador.estructura;
+          estructuraFotos = borrador.estructura.map(function(item) {
+            return {
+              item: item.item,
+              estado: item.estado,
+              fotosList: item.fotosList.map(function(foto) {
+                return { file: foto.fileBlob, previewUrl: URL.createObjectURL(foto.fileBlob), subido: foto.subido, filename: foto.filename };
+              })
+            };
+          });
           document.getElementById("inpNotas").value = borrador.notas || "";
         } else {
           estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
@@ -713,7 +749,6 @@ function iniciarApp() {
       var img = new Image(); img.src = ev.target.result;
       img.onload = function() {
         var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
-        
         var MAX_ANCHO_ALTO = 1920; var anchoOriginal = img.width; var altoOriginal = img.height;
         var nuevoAncho = anchoOriginal; var nuevoAlto = altoOriginal;
 
@@ -774,9 +809,7 @@ function iniciarApp() {
         });
       }
       return secuencial().then(function() { 
-        ov.classList.add("oculto"); 
-        alert("¡Fotos guardadas!"); 
-        renderizarBloqueFotos(); 
+        ov.classList.add("oculto"); alert("¡Fotos guardadas!"); renderizarBloqueFotos(); 
         guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
       });
     }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
@@ -810,7 +843,7 @@ function iniciarApp() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Consolidando y generando libro Excel en la nube...";
     var rb = obtenerRutaCarpetaInspeccion();
-    var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim() };
+    var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notes: document.getElementById("inpNotas").value.trim() };
 
     obtenerToken().then(function(token) {
       var subidasPendientes = [];
