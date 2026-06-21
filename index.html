@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Panel Unificado V3</title>
+<title>Inspecciones SITOC - Formulario y Panel de Escritorio V4</title>
 <script>
 (function() {
   var urls = [
@@ -56,6 +56,7 @@
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
   
   .btn-bloque{width:100%;padding:12px;background:var(--azul);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}
+  .btn-bloque:disabled{background:#7c8a94;opacity:0.6;}
   .btn-secundario-bloque{width:100%;padding:10px;background:#fff;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;}
 
   .gps-status-bar {font-size: 13px; padding: 10px; border-radius: 6px; background: #eef1f3; margin-bottom: 14px; font-weight: 500;}
@@ -72,22 +73,15 @@
   .status-na {color: #7f8c8d;}
   .status-subida {color: #2980b9;}
   
-  .foto-item-actions-layout {display: flex; gap: 6px;}
-  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
-  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px;}
+  .foto-item-actions-layout {display: flex; gap: 4px;}
+  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
+  .btn-accion-galeria {background: var(--indigo); color: #fff; border: none; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
+  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 8px; border-radius: 6px; font-size: 12px;}
 
   .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
   .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
   .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover; cursor: pointer;}
   .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 0; z-index: 2;}
-
-  /* VENTANA OPCIONES ORIGEN FOTO (MENU EMERGENTE) */
-  #modalOrigenFoto {position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: flex; align-items: flex-end; justify-content: center;}
-  .origen-sheet {background: #fff; width: 100%; max-width: 500px; border-radius: 16px 16px 0 0; padding: 20px; box-shadow: 0 -4px 12px rgba(0,0,0,0.15);}
-  .origen-sheet h3 {margin: 0 0 16px; font-size: 16px; color: var(--azul-osc); text-align: center;}
-  .origen-opciones {display: flex; flex-direction: column; gap: 10px;}
-  .btn-origen {width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--gris-borde); font-size: 16px; font-weight: 600; background: #fafafa; cursor: pointer; text-align: center; color: var(--texto);}
-  .btn-origen-cancelar {background: #eef1f3; border: none; color: var(--rojo); margin-top: 6px;}
 
   #modalVisorGrande {position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; cursor: pointer;}
   #modalVisorGrande img {max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2);}
@@ -115,7 +109,7 @@
 
 <div id="pantallaLogin">
   <h1>Inspecciones SITOC</h1>
-  <p>Inicia sesión con tu cuenta corporativa.</p>
+  <p>Inicia sesión con tu cuenta de Microsoft (Corporativa o Personal Externo).</p>
   <button id="btnLogin">&#128274; Iniciar sesión con Microsoft</button>
 </div>
 
@@ -151,7 +145,7 @@
       <label for="inpFecha">Fecha</label>
       <input type="date" id="inpFecha">
       <div id="gpsStatusBar" class="gps-status-bar">&#128205; <span id="gpsStatusTexto">Buscando coordenadas GPS automáticamente...</span></div>
-      <label for="inpNotas">Notes / observaciones generales</label>
+      <label for="inpNotas">Notas / observaciones generales</label>
       <textarea id="inpNotas" placeholder="Describe lo encontrado..."></textarea>
     </div>
     
@@ -172,7 +166,7 @@
       <h2>Panel de Control y Monitoreo en Vivo</h2>
       <div class="subtitulo-bloque">Visualiza y aprueba el material que los técnicos están capturando en tiempo real.</div>
       
-      <button class="btn-bloque" id="btnCargarCarpetasActivas" style="margin-bottom:14px; background:var(--indigo);">🔄 Buscar Inspecciones Activas en SharePoint</button>
+      <button class="btn-bloque" id="btnCargarCarpetasActivas" style="margin-bottom:14px; background:var(--indigo);" disabled>🔄 Conectando con SharePoint (Cargando...)</button>
       
       <label for="selCarpetaMonitoreo">Seleccionar Inspección en Campo</label>
       <select id="selCarpetaMonitoreo"><option value="">Haga clic en el botón de arriba para buscar...</option></select>
@@ -187,19 +181,8 @@
   </main>
 </div>
 
-<input type="file" id="inputCapturaCamara" accept="image/*" capture="environment">
-<input type="file" id="inputCapturaGaleria" accept="image/*" multiple>
-
-<div id="modalOrigenFoto" class="oculto">
-  <div class="origen-sheet">
-    <h3>¿Cómo deseas añadir la foto?</h3>
-    <div class="origen-opciones">
-      <button class="btn-origen" id="btnLlamarCamara">📸 Tomar Foto con Cámara</button>
-      <button class="btn-origen" id="btnLlamarGaleria">📁 Seleccionar de Galería</button>
-      <button class="btn-origen btn-origen-cancelar" id="btnCancelarOrigen">Cancelar</button>
-    </div>
-  </div>
-</div>
+<input type="file" id="inputCamaraDirecta" accept="image/*" capture="environment">
+<input type="file" id="inputGaleriaDirecta" accept="image/*" multiple>
 
 <div id="modalVisorGrande" class="oculto">
   <img id="imgVisorGrandeTarget" src="" alt="Vista Previa">
@@ -246,15 +229,12 @@ var ITEMS_FOTOS_PLANTILLA = [
 
 function procesarCSVNativo(textoPlano) {
   try {
-    var lineas = textoPlano.split(/\r?\n/);
-    var filasMapeadas = [];
+    var lineas = textoPlano.split(/\r?\n/); var filasMapeadas = [];
     for (var i = 0; i < lineas.length; i++) {
       var linea = lineas[i].trim(); if (!linea) continue;
       var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
-      var cli = celdas[0] ? celdas[0].trim() : "";
-      var pro = celdas[1] ? celdas[1].trim() : "";
-      var act = celdas[2] ? celdas[2].trim() : "";
-      var est = celdas[3] ? celdas[3].trim() : "";
+      var cli = celdas[0] ? celdas[0].trim() : ""; var pro = celdas[1] ? celdas[1].trim() : "";
+      var act = celdas[2] ? celdas[2].trim() : ""; var est = celdas[3] ? celdas[3].trim() : "";
       if (i === 0 && cli.toLowerCase().includes("client")) continue;
       if (cli && pro) {
         filasMapeadas.push({ cliente: cli.toUpperCase(), proyecto: pro.toUpperCase(), actividad: act ? act.toUpperCase() : "INSTALACION", estacion: est ? est.toUpperCase() : "SITIO GENERAL" });
@@ -266,8 +246,16 @@ function procesarCSVNativo(textoPlano) {
 
 function iniciarApp() {
   var msalConfig = {
-    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: CONFIG.redirectUri },
-    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
+    auth: { 
+      clientId: CONFIG.clientId, 
+      authority: "https://login.microsoftonline.com/common", 
+      redirectUri: CONFIG.redirectUri,
+      validateAuthority: false
+    },
+    cache: { 
+      cacheLocation: "localStorage", 
+      storeAuthStateInCookie: true
+    }
   };
 
   var msalInstance = new msal.PublicClientApplication(msalConfig);
@@ -278,18 +266,41 @@ function iniciarApp() {
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
   msalInstance.initialize().then(function() {
-    return msalInstance.handleRedirectPromise();
-  }).then(function() {
-    msalInicializado = true;
     var cuentas = msalInstance.getAllAccounts();
-    if (cuentas.length > 0) { cuentaActual = cuentas[0]; mostrarAppPrincipal(); } 
-    else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
-  }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
+    msalInicializado = true;
+    if (cuentas.length > 0) { 
+      cuentaActual = cuentas[0]; 
+      mostrarAppPrincipal(); 
+    } else { 
+      document.getElementById("pantallaLogin").classList.remove("oculto"); 
+    }
+  }).catch(function(e) { 
+    console.error("Error inicializando MSAL:", e);
+    document.getElementById("pantallaLogin").classList.remove("oculto"); 
+  });
 
   document.getElementById("btnLogin").addEventListener("click", function() {
-    if (msalInicializado) msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
+    if (msalInicializado) {
+      msalInstance.loginPopup({ scopes: SCOPES })
+        .then(function(respuesta) {
+          cuentaActual = respuesta.account;
+          mostrarAppPrincipal();
+        })
+        .catch(function(error) {
+          console.error("Error en Login:", error);
+          alert("Error al iniciar sesión: " + error.message);
+        });
+    }
   });
-  document.getElementById("btnLogout").addEventListener("click", function() { msalInstance.logoutRedirect(); });
+
+  document.getElementById("btnLogout").addEventListener("click", function() { 
+    msalInstance.logoutPopup({
+      account: msalInstance.getActiveAccount() || cuentaActual,
+      onRedirectNavigate: function() { return false; }
+    }).then(function() {
+      window.location.reload();
+    });
+  });
 
   document.getElementById("navCampo").addEventListener("click", function() {
     document.getElementById("navCampo").classList.add("btn-nav-active");
@@ -310,7 +321,7 @@ function iniciarApp() {
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { return r.accessToken; })
-      .catch(function() { return msalInstance.acquireTokenRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri }); });
+      .catch(function() { return msalInstance.acquireTokenPopup({ scopes: SCOPES }); });
   }
 
   function mostrarAppPrincipal() {
@@ -332,6 +343,13 @@ function iniciarApp() {
 
     resolverSitioYDrive()
       .then(descargarYLeerConfiguracion)
+      .then(function() {
+        var btnBuscarSup = document.getElementById("btnCargarCarpetasActivas");
+        if (btnBuscarSup) {
+          btnBuscarSup.disabled = false;
+          btnBuscarSup.textContent = "🔄 Buscar Inspecciones Activas en SharePoint";
+        }
+      })
       .catch(function(e) { console.error(e); });
   }
 
@@ -361,10 +379,8 @@ function iniciarApp() {
 
   function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
-  var selCliente = document.getElementById("selCliente");
-  var selProyecto = document.getElementById("selProyecto");
-  var selActividad = document.getElementById("selActividad");
-  var selEstacion = document.getElementById("selEstacion");
+  var selCliente = document.getElementById("selCliente"); var selProyecto = document.getElementById("selProyecto");
+  var selActividad = document.getElementById("selActividad"); var selEstacion = document.getElementById("selEstacion");
 
   selCliente.addEventListener("change", function() {
     var c = selCliente.value; selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
@@ -407,18 +423,25 @@ function iniciarApp() {
       info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
 
       var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
-      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Añadir";
       
-      // DESPLEGAR EL MENÚ DE SELECCIÓN DE ORIGEN
+      // BOTÓN 1: Activa la cámara de forma directa e inmediata
+      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Cámara";
       bF.addEventListener("click", function() { 
         indiceItemSeleccionado = idx; 
-        document.getElementById("modalOrigenFoto").classList.remove("oculto");
+        document.getElementById("inputCamaraDirecta").click();
+      });
+      
+      // BOTÓN 2: Abre el carrete o galería directamente
+      var bG = document.createElement("button"); bG.type = "button"; bG.className = "btn-accion-galeria"; bG.textContent = "📁 Galería";
+      bG.addEventListener("click", function() {
+        indiceItemSeleccionado = idx;
+        document.getElementById("inputGaleriaDirecta").click();
       });
       
       var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
       bN.addEventListener("click", function() { estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotos(); });
       
-      acts.appendChild(bF); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
+      acts.appendChild(bF); acts.appendChild(bG); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
 
       if (foto.fotosList.length > 0) {
         var tc = document.createElement("div"); tc.className = "thumbs-container";
@@ -438,19 +461,6 @@ function iniciarApp() {
     });
   }
 
-  // ACCIONES DEL MENÚ DE ORIGEN DE FOTOS
-  document.getElementById("btnLlamarCamara").addEventListener("click", function() {
-    document.getElementById("modalOrigenFoto").classList.add("oculto");
-    document.getElementById("inputCapturaCamara").click();
-  });
-  document.getElementById("btnLlamarGaleria").addEventListener("click", function() {
-    document.getElementById("modalOrigenFoto").classList.add("oculto");
-    document.getElementById("inputCapturaGaleria").click();
-  });
-  document.getElementById("btnCancelarOrigen").addEventListener("click", function() {
-    document.getElementById("modalOrigenFoto").classList.add("oculto");
-  });
-
   function eliminarFotoEspecifica(itemIdx, fotoIdx) {
     var item = estructuraFotos[itemIdx];
     if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
@@ -466,8 +476,8 @@ function iniciarApp() {
   }
   document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
 
-  // PROCESAR FOTOS (COMÚN PARA AMBOS INPUTS)
-  function procesarArchivosSeleccionados(files) {
+  // MANEJO PROCESO DE CAPTURA - FUNCIÓN COMPARTIDA PARA PROCESAR IMÁGENES
+  function procesarArchivosCargados(files) {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado];
       itemActual.estado = "TOMADA";
@@ -483,11 +493,14 @@ function iniciarApp() {
     }
   }
 
-  document.getElementById("inputCapturaCamara").addEventListener("change", function(e) {
-    procesarArchivosSeleccionados(Array.from(e.target.files)); e.target.value = "";
+  document.getElementById("inputCamaraDirecta").addEventListener("change", function(e) {
+    procesarArchivosCargados(Array.from(e.target.files));
+    e.target.value = "";
   });
-  document.getElementById("inputCapturaGaleria").addEventListener("change", function(e) {
-    procesarArchivosSeleccionados(Array.from(e.target.files)); e.target.value = "";
+
+  document.getElementById("inputGaleriaDirecta").addEventListener("change", function(e) {
+    procesarArchivosCargados(Array.from(e.target.files));
+    e.target.value = "";
   });
 
   function estamparMarcaDeAgua(f, c, e, h, cb) {
@@ -497,32 +510,23 @@ function iniciarApp() {
       img.onload = function() {
         var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
         
-        // === NUEVA MEJORA: ESCALADO DINÁMICO A RESOLUCIÓN FULL HD (1080p) ===
-        var MAX_ANCHO_ALTO = 1920; // Dimensión FHD estandarizada
-        var anchoOriginal = img.width; var altoOriginal = img.height;
+        var MAX_ANCHO_ALTO = 1920; var anchoOriginal = img.width; var altoOriginal = img.height;
         var nuevoAncho = anchoOriginal; var nuevoAlto = altoOriginal;
 
         if (anchoOriginal > MAX_ANCHO_ALTO || altoOriginal > MAX_ANCHO_ALTO) {
           if (anchoOriginal > altoOriginal) {
-            nuevoAncho = MAX_ANCHO_ALTO;
-            nuevoAlto = Math.round((altoOriginal * MAX_ANCHO_ALTO) / anchoOriginal);
+            nuevoAncho = MAX_ANCHO_ALTO; nuevoAlto = Math.round((altoOriginal * MAX_ANCHO_ALTO) / anchoOriginal);
           } else {
-            nuevoAlto = MAX_ANCHO_ALTO;
-            nuevoAncho = Math.round((anchoOriginal * MAX_ANCHO_ALTO) / altoOriginal);
+            nuevoAlto = MAX_ANCHO_ALTO; nuevoAncho = Math.round((anchoOriginal * MAX_ANCHO_ALTO) / altoOriginal);
           }
         }
 
-        canvas.width = nuevoAncho; canvas.height = nuevoAlto; 
-        ctx.drawImage(img, 0, 0, nuevoAncho, nuevoAlto);
-        
-        // Proporciones estéticas adaptadas para el banner inferior de datos
+        canvas.width = nuevoAncho; canvas.height = nuevoAlto; ctx.drawImage(img, 0, 0, nuevoAncho, nuevoAlto);
         var ac = Math.max(65, Math.round(canvas.height * 0.08)), tf = Math.max(14, Math.round(ac * 0.25));
         ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - ac, canvas.width, ac);
         ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
         ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
         ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
-        
-        // Guardar con compresión de calidad JPG balanceada al 85%
         canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.85);
       };
     };
@@ -536,11 +540,8 @@ function iniciarApp() {
     return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(selEstacion.value || "SITIO") + "_" + limpiarNombre(t);
   }
 
-  // BOTÓN GUARDAR BLOQUE 1
   document.getElementById("btnGuardarBloque1").addEventListener("click", function() {
-    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) {
-      alert("Faltan datos de ubicación o nombre del técnico."); return;
-    }
+    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Faltan datos de ubicación o técnico."); return; }
     var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
     ov.classList.remove("oculto"); var rb = obtenerRutaCarpetaInspeccion();
 
@@ -558,11 +559,11 @@ function iniciarApp() {
         }
       });
 
-      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas por guardar."); return; }
+      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas."); return; }
       var i = 0;
       function secuencial() {
         if (i >= list.length) return Promise.resolve();
-        oT.textContent = "Subiendo archivo " + (i + 1) + " de " + list.length + "...";
+        oT.textContent = "Guardando en la nube: " + (i + 1) + " de " + list.length + "...";
         var el = list[i];
         return subirArchivo(token, el.ruta, el.file).then(function() {
           el.fotoRef.subido = true; el.itemRef.estado = "SUBIDA"; i++; return secuencial();
@@ -573,9 +574,9 @@ function iniciarApp() {
   });
 
   document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
-    if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación para verificar."); return; }
+    if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Sincronizando con Supervisor...";
+    document.getElementById("estadoEnvioTexto").textContent = "Sincronizando aprobaciones del Supervisor...";
     var rb = obtenerRutaCarpetaInspeccion() + "/fotos";
 
     obtenerToken().then(function(token) {
@@ -595,65 +596,126 @@ function iniciarApp() {
   });
 
   document.getElementById("btnEnviar").addEventListener("click", function() {
-    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos."); return; }
+    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete los campos."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Consolidando reporte técnico...";
+    document.getElementById("estadoEnvioTexto").textContent = "Consolidando y generando libro Excel en la nube...";
     var rb = obtenerRutaCarpetaInspeccion();
     var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim() };
 
     obtenerToken().then(function(token) {
-      var csv = "REPORTE DE INSPECCION\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
-      return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }))
-        .then(function() { return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb, { headers: { Authorization: "Bearer " + token } }).then(function(r){return r.json();}); })
-        .then(function(j) { return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); })
-        .then(function() {
-          ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-          document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección consolidada indexada.";
+      var subidasPendientes = [];
+      estructuraFotos.forEach(function(item) {
+        if (item.estado === "TOMADA") {
+          item.fotosList.forEach(function(fObj, index) {
+            if (!fObj.subido) {
+              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (index + 1) + ".jpg";
+              fObj.filename = nombreArchivo;
+              subidasPendientes.push({ ruta: rb + "/fotos/" + nombreArchivo, file: fObj.file, itemRef: item, fotoRef: fObj });
+            }
+          });
+        }
+      });
+
+      var sIdx = 0;
+      function vaciarUltimas() {
+        if (sIdx >= subidasPendientes.length) return Promise.resolve();
+        var tgt = subidasPendientes[sIdx];
+        return subirArchivo(token, tgt.ruta, tgt.file).then(function(){
+          tgt.fotoRef.subido = true; tgt.itemRef.estado = "SUBIDA"; sIdx++; return vaciarUltimas();
         });
+      }
+
+      return vaciarUltimas().then(function() {
+        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + "/fotos:/children", { headers: { Authorization: "Bearer " + token } })
+          .then(function(r) { return r.ok ? r.json() : { value: [] }; });
+      }).then(function(resFotosNube) {
+        var blobExcelFotos = construirReporteExcelFotos(d.estacion, resFotosNube.value || []);
+        return subirArchivo(token, rb + "/reporte_fotografico_sitoc.xls", blobExcelFotos);
+      }).then(function() {
+        var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
+        return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }));
+      }).then(function() {
+        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb, { headers: { Authorization: "Bearer " + token } }).then(function(r){return r.json();});
+      }).then(function(j) { 
+        return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); 
+      }).then(function() {
+        ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
+        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada. Se creó el archivo de Excel unificado con las fotos alineadas en columna.";
+      });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-// =======================================================
-  // BUSCADOR EN TIEMPO REAL PARA SUPERVISOR (SIN RETRASO DE INDEXACIÓN)
-  // =======================================================
+  function construirReporteExcelFotos(nombreEstacion, listaFotos) {
+    var htmlExcel = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <style>
+          table { border-collapse: collapse; }
+          td, th { border: 1px solid #d3dbe2; padding: 10px; text-align: center; font-family: Arial, sans-serif; font-size: 13px; }
+          th { background-color: #0b3d5c; color: white; font-weight: bold; font-size: 14px; }
+          .titulo { font-size: 18px; font-weight: bold; color: #0b3d5c; text-align: left; padding: 15px 0; }
+          .item-label { font-weight: bold; text-align: left; background-color: #fcfcfc; color: #1c2b36; width: 320px; }
+          .meta-label { color: #5a6b76; width: 180px; }
+          .celda-imagen { width: 180px; height: 130px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td colspan="3" class="titulo">BITÁCORA FOTOGRÁFICA DE INGENIERÍA - ESTACIÓN: ${nombreEstacion.toUpperCase()}</td></tr>
+          <tr>
+            <th>REGISTRO / ÍTEM REQUERIDO</th>
+            <th>ESTADO DE ENTREGA</th>
+            <th>REGISTRO FOTOGRÁFICO DE CAMPO</th>
+          </tr>`;
+
+    if (listaFotos.length === 0) {
+      htmlExcel += `<tr><td colspan="3">No se cargaron registros fotográficos en esta inspección.</td></tr>`;
+    } else {
+      listaFotos.forEach(function(foto) {
+        var nombreLimpio = foto.name.replace(/_/g, " ").replace(".jpg", "").toUpperCase();
+        htmlExcel += `
+          <tr>
+            <td class="item-label">${nombreLimpio}</td>
+            <td class="meta-label">APROBADO / SINCRONIZADO</td>
+            <td><img src="${foto["@microsoft.graph.downloadUrl"]}" class="celda-imagen" width="160" height="120"></td>
+          </tr>`;
+      });
+    }
+
+    htmlExcel += `</table></body></html>`;
+    return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  }
+
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
-    if (!driveId) { alert("El Drive aún no se ha inicializado."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
-    
     var listaSelect = document.getElementById("selCarpetaMonitoreo");
     listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
 
     obtenerToken().then(function(token) {
-      // 1. Listar los clientes (primer nivel dentro de Inspecciones)
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { return r.ok ? r.json() : { value: [] }; })
         .then(function(resClientes) {
           var promesasProyectos = [];
-          
           resClientes.value.forEach(function(itemCliente) {
             if (itemCliente.folder) {
               var rutaCliente = CONFIG.carpetaRaizInspecciones + "/" + itemCliente.name;
-              // 2. Para cada cliente, listar sus proyectos
               var p = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaCliente + ":/children", { headers: { Authorization: "Bearer " + token } })
                 .then(function(r) { return r.ok ? r.json() : { value: [] }; })
                 .then(function(resProyectos) {
                   var promesasSitios = [];
-                  
                   resProyectos.value.forEach(function(itemProyecto) {
                     if (itemProyecto.folder) {
                       var rutaProyecto = rutaCliente + "/" + itemProyecto.name;
-                      // 3. Para cada proyecto, listar las carpetas de inspección finales
                       var s = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaProyecto + ":/children", { headers: { Authorization: "Bearer " + token } })
                         .then(function(r) { return r.ok ? r.json() : { value: [] }; })
                         .then(function(resSitios) {
                           resSitios.value.forEach(function(itemSitio) {
-                            // Validamos que sea una carpeta de inspección (contiene guiones bajos de fecha/técnico)
                             if (itemSitio.folder && itemSitio.name.includes("_")) {
                               var opt = document.createElement("option");
                               opt.value = rutaProyecto + "/" + itemSitio.name + "/fotos";
-                              opt.textContent = "📍 Sitio: " + itemSitio.name;
-                              listaSelect.appendChild(opt);
+                              opt.textContent = "📍 Sitio: " + itemSitio.name; listaSelect.appendChild(opt);
                             }
                           });
                         });
@@ -665,21 +727,12 @@ function iniciarApp() {
               promesasProyectos.push(p);
             }
           });
-          
           return Promise.all(promesasProyectos);
         })
         .then(function() {
-          ov.classList.add("oculto");
-          if (listaSelect.options.length <= 1) {
-            alert("No se encontraron carpetas de inspección creadas en la ruta estándar de SharePoint.");
-          } else {
-            alert("Rastreo en tiempo real completado. Sitios listados con éxito.");
-          }
+          ov.classList.add("oculto"); alert("Rastreo en tiempo real terminado.");
         });
-    }).catch(function(e) { 
-      ov.classList.add("oculto"); 
-      alert("Error en el rastreo: " + e.message); 
-    });
+    }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
   var selMonitoreo = document.getElementById("selCarpetaMonitoreo");
@@ -687,7 +740,7 @@ function iniciarApp() {
 
   function cargarGaleriaSupervisor() {
     var rutaFotos = selMonitoreo.value; if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
-    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos del sitio...";
+    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos...";
     document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
 
     obtenerToken().then(function(token) {
@@ -695,7 +748,6 @@ function iniciarApp() {
         .then(function(r) { return r.json(); })
         .then(function(json) {
           galeria.innerHTML = ""; if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía."; return; }
-          
           json.value.forEach(function(archivo) {
             var card = document.createElement("div"); card.className = "card-foto-superv";
             var img = document.createElement("img"); img.src = archivo["@microsoft.graph.downloadUrl"];
@@ -707,8 +759,7 @@ function iniciarApp() {
             var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑 Rechazar / Eliminar";
             btnR.addEventListener("click", function() {
               if (confirm("¿Deseas eliminar esta foto de SharePoint?")) {
-                var urlBorrar = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id;
-                fetch(urlBorrar, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) {
+                fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) {
                   if (r.ok) { alert("Foto eliminada."); cargarGaleriaSupervisor(); }
                 });
               }
@@ -741,6 +792,7 @@ function esperarMSAL(intentos) {
   if (typeof msal !== "undefined") { iniciarApp(); }
   else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
 }
+window.location.hash = "";
 window.addEventListener("load", function() { esperarMSAL(25); });
 </script>
 </body>
