@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.1</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.3</title>
 <script>
 (function() {
   var urls = [
@@ -51,7 +51,6 @@
   .seccion-bloque-titulo {background: var(--azul-osc); color: #fff; padding: 10px 14px; font-size: 14px; font-weight: 700; border-radius: 6px; margin-top: 25px; margin-bottom: 5px; text-transform: uppercase;}
   .seccion-subbloque-titulo {color: var(--naranja); font-size: 13px; font-weight: 600; padding: 4px 14px; margin-bottom: 10px; border-left: 3px solid var(--naranja); background: #fffcf9;}
 
-  /* Clases específicas para los separadores del Supervisor */
   .supervisor-bloque-header {background: var(--azul); color: white; padding: 8px 12px; font-size: 13px; font-weight: bold; border-radius: 4px; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase;}
 
   .contenedor-borradores {display: flex; flex-direction: column; gap: 8px; margin-top: 10px;}
@@ -512,6 +511,23 @@ function iniciarApp() {
     document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
     document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
 
+    // --- REGLA DE ACCESO HÍBRIDO (CORPORATIVO / PERSONAL) ---
+    var esCuentaPersonal = false;
+    if (cuentaActual.tenantId === "9188040d-6c67-4c5b-b112-36a304b66dad") {
+      esCuentaPersonal = true;
+    } else {
+      var uMin = (cuentaActual.username || "").toLowerCase();
+      if (uMin.endsWith("@outlook.com") || uMin.endsWith("@hotmail.com") || uMin.endsWith("@live.com")) {
+        esCuentaPersonal = true;
+      }
+    }
+
+    if (esCuentaPersonal) {
+      var btnSup = document.getElementById("navSupervisor");
+      if (btnSup) btnSup.classList.add("oculto");
+      console.log("Acceso restrictivo: Cuenta personal de técnico. Panel de control bloqueado.");
+    }
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function(pos) {
         ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
@@ -544,14 +560,29 @@ function iniciarApp() {
     });
   }
 
+  // RESTRICCIÓN Y EVALUACIÓN DE ERRORES CON .CATCH PARA EL SELECT
   function descargarYLeerConfiguracion() {
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.ok ? r.text() : ""; })
+        .then(function(r) { 
+          if (!r.ok) {
+            throw new Error("Código de estado HTTP: " + r.status + " (" + r.statusText + ")");
+          }
+          return r.text(); 
+        })
         .then(function(texto) {
           datosConfiguracion = procesarCSVNativo(texto);
           var clientes = uniques(datosConfiguracion.map(function(f) { return f.cliente; }));
+          if (clientes.length === 0) {
+            document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Archivo vacío o mal formateado</option>';
+            return;
+          }
           document.getElementById("selCliente").innerHTML = '<option value="">Selecciona un cliente</option>' + clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
+        })
+        .catch(function(error) {
+          console.error("Error al descargar configuración:", error);
+          document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Error de comunicación con SharePoint</option>';
+          alert("Fallo al descargar listas de SharePoint.\nDetalle Técnico: " + error.message + "\n\nSoluciones:\n1. Revisa que el usuario tenga permisos en el SharePoint.\n2. Asegúrate que 'configuracion.csv' no fue renombrado.");
         });
     });
   }
@@ -883,7 +914,6 @@ function iniciarApp() {
     htmlExcel += `</table></body></html>`; return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
   }
 
-  // INTERFAZ SUPERVISOR COORDINA AGRUPAMIENTO POR BLOQUES EN VIVO
   document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
@@ -936,7 +966,6 @@ function iniciarApp() {
           galeria.innerHTML = ""; 
           if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía en este sitio."; return; }
           
-          // Estructura contenedora para clasificar los archivos recibidos
           var gruposClasificados = {
             "BLOQUE 1: INSTALACIÓN DE ANTENAS": [],
             "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR": [],
@@ -946,7 +975,6 @@ function iniciarApp() {
             "OTROS ARCHIVOS NO CLASIFICADOS": []
           };
 
-          // Recorrer los archivos devueltos por SharePoint y agruparlos según patrón del nombre
           json.value.forEach(function(archivo) {
             var nMin = archivo.name.toLowerCase();
             var asignado = false;
@@ -963,23 +991,17 @@ function iniciarApp() {
               gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
             }
 
-            if (!asignado) {
-              gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo);
-            }
+            if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
           });
 
-          // Renderizar los bloques que contengan al menos una foto
           Object.keys(gruposClasificados).forEach(function(nombreBloque) {
             var listaFotosBloque = gruposClasificados[nombreBloque];
             if (listaFotosBloque.length > 0) {
-              
-              // 1. Título del bloque separador
               var tituloBloqueDiv = document.createElement("div");
               tituloBloqueDiv.className = "supervisor-bloque-header";
               tituloBloqueDiv.textContent = nombreBloque + " (" + listaFotosBloque.length + " fotos)";
               galeria.appendChild(tituloBloqueDiv);
 
-              // 2. Grid de tarjetas de fotos para este bloque
               var gridDiv = document.createElement("div");
               gridDiv.className = "grid-supervisor-fotos";
 
@@ -995,7 +1017,6 @@ function iniciarApp() {
                 });
                 card.appendChild(img); card.appendChild(meta); card.appendChild(btnR); gridDiv.appendChild(card);
               });
-
               galeria.appendChild(gridDiv);
             }
           });
