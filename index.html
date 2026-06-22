@@ -484,21 +484,6 @@ function iniciarApp() {
       });
   });
 
-  msalInstance.loginPopup({ scopes: SCOPES })
-    .then(function(respuesta) {
-      cuentaActual = respuesta.account;
-      inicializarBaseDatosMultitarea().then(mostrarAppPrincipal);
-    })
-    .catch(function(error) {
-      console.error("Error en login:", error);
-      if (error.errorCode === "popup_window_error") {
-        alert("El navegador bloqueó la ventana emergente. Por favor, permite las ventanas emergentes para este sitio e intenta de nuevo.");
-      } else {
-        alert("Error de autenticación: " + error.message);
-      }
-    });
-});
-
   document.getElementById("btnLogout").addEventListener("click", function() { 
     if (msalInstance && cuentaActual) {
       msalInstance.logoutRedirect({ 
