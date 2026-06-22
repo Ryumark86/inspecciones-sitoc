@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.5</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.5.2</title>
 <script>
 (function() {
   var urls = [
@@ -284,6 +284,8 @@ var datosConfiguracion = [];
 var estructuraFotos = [];
 var ultimaEstacionSeleccionada = "";
 var bloqueadorEventosDropdowns = false;
+// Se declara la variable GPS en el alcance global seguro
+var ubicacionCapturada = null;
 
 function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
@@ -439,23 +441,24 @@ function iniciarApp() {
   var msalInstance = new msal.PublicClientApplication(msalConfig);
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
   var cuentaActual = null; var siteId = null; var driveId = null;
-  var msalInicializado = false; var ubicacionCapturada = null;
+  var msalInicializado = false;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
-  // ✅ CLAVE: handleRedirectPromise limpia el estado interno de MSAL correctamente
-  msalInstance.handleRedirectPromise().catch(function() {}).finally(function() {
-    msalInstance.initialize().then(function() {
-      var cuentas = msalInstance.getAllAccounts();
-      msalInicializado = true;
-      if (cuentas.length > 0) { 
-        cuentaActual = cuentas[0]; 
-        inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); 
-      } else { 
-        document.getElementById("pantallaLogin").classList.remove("oculto"); 
-      }
-    }).catch(function() { 
+  // Secuencialidad estricta para MSAL v2 en entornos web móviles
+  msalInstance.initialize().then(function() {
+    return msalInstance.handleRedirectPromise();
+  }).then(function() {
+    var cuentas = msalInstance.getAllAccounts();
+    msalInicializado = true;
+    if (cuentas.length > 0) { 
+      cuentaActual = cuentas[0]; 
+      inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); 
+    } else { 
       document.getElementById("pantallaLogin").classList.remove("oculto"); 
-    });
+    }
+  }).catch(function(err) { 
+    console.error("Error en inicialización MSAL:", err);
+    document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
 
   document.getElementById("btnLogin").addEventListener("click", function() {
@@ -464,7 +467,6 @@ function iniciarApp() {
       return;
     }
 
-    // Limpiar estado residual antes de intentar login
     Object.keys(sessionStorage).forEach(function(key) {
       if (key.indexOf("msal") !== -1) sessionStorage.removeItem(key);
     });
@@ -535,18 +537,17 @@ function iniciarApp() {
     document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
   });
 
- function obtenerToken() {
-  return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
-    .then(function(r) { return r.accessToken; })
-    .catch(function() {
-      // Limpiar estado atascado antes del popup de token también
-      Object.keys(sessionStorage).forEach(function(key) {
-        if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
+  function obtenerToken() {
+    return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
+      .then(function(r) { return r.accessToken; })
+      .catch(function() {
+        Object.keys(sessionStorage).forEach(function(key) {
+          if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
+        });
+        return msalInstance.acquireTokenPopup({ scopes: SCOPES })
+          .then(function(r) { return r.accessToken; });
       });
-      return msalInstance.acquireTokenPopup({ scopes: SCOPES, account: cuentaActual })
-        .then(function(r) { return r.accessToken; });
-    });
-}
+  }
 
   function mostrarAppPrincipal() {
     document.getElementById("pantallaLogin").classList.add("oculto");
@@ -572,6 +573,7 @@ function iniciarApp() {
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function(pos) {
+        // Escritura limpia sobre el espacio global unificado
         ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
         document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
         document.getElementById("gpsStatusBar").classList.add("gps-success");
@@ -628,7 +630,7 @@ function iniciarApp() {
     });
   }
 
-  function gestionarCambioDeEstacionProactivo() {
+  function gestionarChangeDeEstacionProactivo() {
     if (bloqueadorEventosDropdowns) return;
     if (ultimaEstacionSeleccionada && estructuraFotos.some(function(i){return i.fotosList.length > 0 || i.estado === "NA";})) {
       guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
@@ -670,7 +672,7 @@ function iniciarApp() {
     var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
     document.getElementById("selProyecto").innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     document.getElementById("selProyecto").disabled = false;
-    gestionarCambioDeEstacionProactivo();
+    gestionarChangeDeEstacionProactivo();
   });
 
   document.getElementById("selProyecto").addEventListener("change", function() {
@@ -680,7 +682,7 @@ function iniciarApp() {
     var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
     document.getElementById("selActividad").innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     document.getElementById("selActividad").disabled = false;
-    gestionarCambioDeEstacionProactivo();
+    gestionarChangeDeEstacionProactivo();
   });
 
   document.getElementById("selActividad").addEventListener("change", function() {
@@ -690,10 +692,10 @@ function iniciarApp() {
     var e = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
     document.getElementById("selEstacion").innerHTML += e.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     document.getElementById("selEstacion").disabled = false;
-    gestionarCambioDeEstacionProactivo();
+    gestionarChangeDeEstacionProactivo();
   });
 
-  document.getElementById("selEstacion").addEventListener("change", gestionarCambioDeEstacionProactivo);
+  document.getElementById("selEstacion").addEventListener("change", gestionarChangeDeEstacionProactivo);
 
   function renderizarBloqueFotosDinamicos() {
     var contenedor = document.getElementById("contenedorDinamicoBloquesFotos"); contenedor.innerHTML = "";
@@ -993,7 +995,6 @@ function iniciarApp() {
 
   document.getElementById("selCarpetaMonitoreo").addEventListener("change", cargarGaleriaSupervisor);
 
-  // 🕵️‍♂️ MODO ESCRITORIO: Organización estricta de fotos recibidas por bloques de ingeniería
   function cargarGaleriaSupervisor() {
     var rutaFotos = document.getElementById("selCarpetaMonitoreo").value; 
     if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
