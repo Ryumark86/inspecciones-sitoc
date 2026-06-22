@@ -536,25 +536,30 @@ function iniciarApp() {
           if (!r.ok) throw new Error("No se encontró el archivo de control en SharePoint.");
           return r.text();
         })
-        .then(function(csvTexto) {
-          var lineas = csvTexto.split(/\r?\n/);
-          var autorizado = false;
-          for (var i = 0; i < lineas.length; i++) {
-            var lineaLimpia = lineas[i].trim().toLowerCase();
-            if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
-              autorizado = true;
-              break;
-            }
-          }
+       // ... (dentro de validarFiltroYPermisosUsuario)
+.then(function(csvTexto) {
+  // .replace(/\r/g, "") elimina el retorno de carro invisible que mete Excel
+  var lineas = csvTexto.replace(/\r/g, "").split("\n");
+  var autorizado = false;
+  
+  for (var i = 0; i < lineas.length; i++) {
+    // .trim() limpia cualquier espacio o residuo extraño al inicio o final
+    var lineaLimpia = lineas[i].trim().toLowerCase();
+    if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
+      autorizado = true;
+      break;
+    }
+  }
 
-          if (autorizado) {
-            console.log("Acceso aprobado: Técnico externo autorizado.");
-            mostrarAppPrincipal(true);
-          } else {
-            alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.\n\nPor favor, solicita al Coordinador SITOC que registre tu correo.");
-            ejecutarCierreSesion();
-          }
-        })
+  if (autorizado) {
+    console.log("Acceso aprobado: Técnico externo autorizado.");
+    mostrarAppPrincipal(true);
+  } else {
+    alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.");
+    ejecutarCierreSesion();
+  }
+})
+// ...
         .catch(function(err) {
           console.error(err);
           alert("Error de validación: Comunícate con soporte de SITOC. Detalle: " + err.message);
