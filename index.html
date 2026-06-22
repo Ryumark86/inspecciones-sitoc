@@ -236,8 +236,16 @@ var CONFIG = {
   archivoConfiguracion: "configuracion.csv",
   archivoMaestro: "maestro_inspecciones.csv",
   archivoTecnicosAutorizados: "tecnicos_autorizados.csv",
-  carpetaRaizInspecciones: "Inspecciones"
+  carpetaRaizInspecciones: "Inspecciones",
+  scopes: ["User.Read", "Sites.ReadWrite.All"],
 };
+
+var SCOPES = CONFIG.scopes;
+
+var indiceItemSeleccionado = null;
+var procesandoMarcasDeAgua = 0;
+var appIniciada = false;
+
 
 var MAESTRO_BLOQUES_PLANTILLA = [
   { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto linea de vista de la antena" },
@@ -452,87 +460,40 @@ function resolverSitioYDrive() {
   });
 }
 
-function iniciarApp() {
-  var msalConfig = {
-    auth: { 
-      clientId: CONFIG.clientId, 
-      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, 
-      redirectUri: CONFIG.redirectUri, 
-      validateAuthority: true 
-    },
-    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
-  };
-
-  msalInstance = new msal.PublicClientApplication(msalConfig);
-  var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
-  var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
-
-  // ✅ ARRANQUE PASIVO TOTAL: Evita llamar flujos interactivos o silent fallidos que lancen popups automáticos
-  msalInstance.initialize().then(function() {
-    var cuentas = msalInstance.getAllAccounts();
-    if (cuentas.length > 0) { 
-      cuentaActual = cuentas[0]; 
-      inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario); 
-    } else { 
-      document.getElementById("pantallaLogin").classList.remove("oculto"); 
-    }
-  }).catch(function(err) { 
-    console.error("Error en arranque MSAL:", err);
-    document.getElementById("pantallaLogin").classList.remove("oculto"); 
-  });
-
-  // ✅ LOGIN POPUP UNIFICADO DISPARADO EXCLUSIVAMENTE POR EVENTO HUMANO (ELIMINA EL NESTED POPUP)
-  document.getElementById("btnLogin").addEventListener("click", function() {
-    var botonLogin = document.getElementById("btnLogin");
-    var divError = document.getElementById("loginError");
-
-    botonLogin.disabled = true;
-    divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
-
-    // Limpiamos flags viejos de interacción para abrir canal limpio
-    Object.keys(localStorage).forEach(function(key) { if (key.includes("interaction.status")) localStorage.removeItem(key); });
-    Object.keys(sessionStorage).forEach(function(key) { if (key.includes("interaction.status")) sessionStorage.removeItem(key); });
-
-    msalInstance.loginPopup({ 
-      scopes: SCOPES, 
-      redirectUri: CONFIG.redirectUri,
-      prompt: "select_account"
-    })
-    .then(function(loginResponse) {
-      cuentaActual = loginResponse.account;
-      divError.innerHTML = "";
-      botonLogin.disabled = false;
-      return inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
-    }).catch(function(err) {
-      console.error("Error en loginPopup:", err);
-      botonLogin.disabled = false;
-      divError.innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || "Interrupción de red. Intenta nuevamente."}</div>`;
-    });
-  });
-
-  document.getElementById("btnLogout").addEventListener("click", function() { 
-    ejecutarCierreSesion();
-  });
-
-  function ejecutarCierreSesion() {
-    Object.keys(localStorage).forEach(function(key) { if (key.indexOf("msal.") === 0) localStorage.removeItem(key); });
-    Object.keys(sessionStorage).forEach(function(key) { if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key); });
-    window.location.reload();
-  }
-
   // ✅ ADQUISICIÓN ROBUSTA DE TOKENS (SI EL SILENCIOSO FALLA LANZA POPUP MANUAL ASÍNCRONO)
-  function obtenerToken() {
-    return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
-      .then(function(r) { 
-        return r.accessToken; 
-      })
-      .catch(function(err) {
-        console.warn("Silent falló, abriendo canal interactivo discreto:", err.message);
-        return msalInstance.acquireTokenPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
-          .then(function(r) { return r.accessToken; });
-      });
+ async function obtenerToken() {
+
+  if (!cuentaActual) {
+    throw new Error("No autenticado");
   }
 
+  try {
+
+    const resp = await msalInstance.acquireTokenSilent({
+      scopes: SCOPES,
+      account: cuentaActual
+    });
+
+    return resp.accessToken;
+
+  } catch (err) {
+
+    console.warn("Token inválido:", err.message);
+
+    // ✅ limpiar sesión (PRO)
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith("msal.")) localStorage.removeItem(k);
+    });
+
+    Object.keys(sessionStorage).forEach(k => {
+      if (k.startsWith("msal.")) sessionStorage.removeItem(k);
+    });
+
+    location.reload();
+
+    throw new Error("Sesión expirada");
+  }
+}
   window.obtenerToken = obtenerToken;
 
   function validarFiltroYPermisosUsuario() {
@@ -1129,9 +1090,91 @@ function iniciarApp() {
 
 function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 
+function iniciarApp() {
+
+  msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CONFIG.clientId,
+      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
+      redirectUri: CONFIG.redirectUri
+    },
+    cache: {
+      cacheLocation: "localStorage",
+      storeAuthStateInCookie: true
+    }
+  });
+
+  msalInstance.initialize().then(function () {
+
+    var cuentas = msalInstance.getAllAccounts();
+
+    if (cuentas.length > 0) {
+      cuentaActual = cuentas[0];
+      inicializarBaseDatosMultitarea()
+        .then(validarFiltroYPermisosUsuario);
+    } else {
+      document.getElementById("pantallaLogin").classList.remove("oculto");
+    }
+  });
+
+  // ✅ LOGIN
+  document.getElementById("btnLogin").addEventListener("click", async function () {
+
+    try {
+
+      const resp = await msalInstance.loginPopup({
+        scopes: SCOPES,
+        prompt: "select_account"
+      });
+
+      cuentaActual = resp.account;
+
+      await inicializarBaseDatosMultitarea();
+      await validarFiltroYPermisosUsuario();
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById("loginError").innerHTML =
+        `<div class="error-msg">${err.message}</div>`;
+    }
+  });
+
+  document.getElementById("btnLogout").addEventListener("click", function () {
+    location.reload();
+  });
+}
+
+function ejecutarCierreSesion() {
+  if (msalInstance) {
+    msalInstance.logoutPopup().finally(() => {
+      limpiarCacheMSAL();
+    });
+  } else {
+    limpiarCacheMSAL();
+  }
+}
+
+function limpiarCacheMSAL() {
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith("msal.")) localStorage.removeItem(k);
+  });
+
+  Object.keys(sessionStorage).forEach(k => {
+    if (k.startsWith("msal.")) sessionStorage.removeItem(k);
+  });
+
+  location.reload();
+}
+
 function esperarMSAL(intentos) {
-  if (typeof msal !== "undefined") { iniciarApp(); }
-  else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
+  if (typeof msal !== "undefined" && !appIniciada) {
+    appIniciada = true;
+    iniciarApp();
+  } else if (intentos > 0) {
+    setTimeout(function() {
+      esperarMSAL(intentos - 1);
+    }, 400);
+  }
 }
 window.location.hash = "";
 window.addEventListener("load", function() { esperarMSAL(25); });
