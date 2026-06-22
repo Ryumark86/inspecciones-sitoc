@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.7.2</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.7.1</title>
 <script>
 (function() {
   var urls = [
@@ -22,7 +22,6 @@
   cargar();
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --azul:#0b3d5c;
@@ -68,7 +67,6 @@
   textarea{resize:vertical;min-height:80px;}
   
   .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:20px;box-shadow: 0 4px 6px rgba(232,115,28,0.25);}
-  .btn-primario:disabled{background:#c9c9c9;cursor:not-allowed;}
   .btn-bloque{width:100%;padding:13px;background:var(--azul);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px;}
   .btn-secundario-bloque{width:100%;padding:10px;background:#fff;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;}
 
@@ -109,23 +107,21 @@
   #pantallaLogin{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;}
   #pantallaLogin h1{color:var(--azul-osc);font-size:22px;margin-bottom:8px;}
   #btnLogin{background:var(--azul);color:#fff;border:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
-  #btnLogin:disabled {background:#c9c9c9; cursor:not-allowed;}
   .oculto{display:none !important;}
   #estadoEnvio{position:fixed;inset:0;background:rgba(8,45,68,.94);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px;text-align:center;}
   .spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:girar 0.8s linear infinite;margin-bottom:18px;}
   @keyframes girar{to{transform:rotate(360deg);}}
   #pantallaExito{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:24px;}
   .check{width:64px;height:64px;background:var(--verde);border-radius:50%;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
-  .error-msg{background:#fdecea;border:1px solid #f5c6c1;color:var(--rojo);padding:12px;border-radius:8px;font-size:13px;margin-bottom:14px;}
 </style>
 </head>
 <body>
 
 <div id="pantallaLogin">
   <h1>Inspecciones SITOC</h1>
-  <p>Inicia sesión con tu cuenta de Microsoft (Corporativa o Personal Autorizado).</p>
+  <p>Inicia sesión con tu cuenta de Microsoft (Corporativa o Personal Externo).</p>
   <button id="btnLogin">&#128274; Iniciar sesión con Microsoft</button>
-  <div id="loginError" style="margin-top:16px; max-width:340px;"></div>
+  <div id="loginError" style="margin-top:10px;"></div>
 </div>
 
 <div id="appPrincipal" class="oculto">
@@ -158,8 +154,8 @@
       <select id="selProyecto" disabled><option value="">Elige un cliente primero</option></select>
       <label for="selActividad">Actividad</label>
       <select id="selActividad" disabled><option value="">Elige un proyecto primero</option></select>
-      <label for="inpEstacion">Estación o sitio de trabajo (Escribe el nombre)</label>
-      <input type="text" id="inpEstacion" placeholder="Ej: Estacion_Barranquilla_Centro">
+      <label for="selEstacion">Estación o sitio de trabajo</label>
+      <select id="selEstacion" disabled><option value="">Elige una actividad primero</option></select>
     </div>
     
     <div class="card">
@@ -292,8 +288,6 @@ var ultimaEstacionSeleccionada = "";
 var bloqueadorEventosDropdowns = false;
 var ubicacionCapturada = null;
 var siteId = null; var driveId = null;
-var msalInstance = null;
-var cuentaActual = null;
 
 function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
@@ -455,10 +449,22 @@ function resolverSitioYDrive() {
   });
 }
 
+var msalInstance = null;
+var cuentaActual = null;
+
 function iniciarApp() {
-  var msalConfig = {
+  // ✅ LIMPIEZA AGRESIVA DE CACHÉ DE POPUPS EN EL ARRANQUE
+  Object.keys(localStorage).forEach(function(key) {
+    if (key.indexOf("msal.") === 0) localStorage.removeItem(key);
+  });
+  Object.keys(sessionStorage).forEach(function(key) {
+    if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
+  });
+
+var msalConfig = {
     auth: { 
       clientId: CONFIG.clientId, 
+      // Usamos 'common' o el tenant específico para evitar el bucle de organizaciones anidadas
       authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, 
       redirectUri: CONFIG.redirectUri, 
       validateAuthority: true 
@@ -473,6 +479,8 @@ function iniciarApp() {
 
   msalInstance.initialize().then(function() {
     msalInicializado = true;
+    
+    // Verificamos si ya hay una sesión guardada en caché
     var cuentas = msalInstance.getAllAccounts();
     if (cuentas.length > 0) { 
       cuentaActual = cuentas[0]; 
@@ -485,40 +493,28 @@ function iniciarApp() {
     document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
 
-  // ✅ BOTÓN DE LOGIN BLINDADO (EVITA DOBLE CLICK E INTERACTION_IN_PROGRESS)
+  // ✅ CONTROLADOR DE POPUP UNIFICADO Y SEGURO (EVITA NESTED POPUPS)
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (!msalInicializado) {
       alert("La librería aún está cargando. Espera un momento.");
       return;
     }
     
-    var botonLogin = document.getElementById("btnLogin");
-    var divError = document.getElementById("loginError");
-
-    botonLogin.disabled = true;
-    divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
+    document.getElementById("loginError").innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
 
     msalInstance.loginPopup({ 
       scopes: SCOPES, 
       redirectUri: CONFIG.redirectUri,
-      prompt: "select_account"
+      prompt: "select_account" // Fuerza a elegir cuenta sin reabrir popups fantasma
     })
     .then(function(loginResponse) {
       cuentaActual = loginResponse.account;
-      divError.innerHTML = "";
-      botonLogin.disabled = false;
+      document.getElementById("loginError").innerHTML = "";
       inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
     }).catch(function(err) {
       console.error("Error en loginPopup:", err);
-      botonLogin.disabled = false;
-
-      if (err.message && err.message.includes("interaction_in_progress")) {
-        divError.innerHTML = `<div class="error-msg">⚠️ Había una solicitud colgada de un intento previo. El caché fue limpiado. ¡Dale clic de nuevo al botón!</div>`;
-        Object.keys(localStorage).forEach(function(key) { if (key.includes("interaction.status")) localStorage.removeItem(key); });
-        Object.keys(sessionStorage).forEach(function(key) { if (key.includes("interaction.status")) sessionStorage.removeItem(key); });
-      } else {
-        divError.innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || err}</div>`;
-      }
+      // Si el usuario cierra el popup o se bloquea, limpiamos el estado
+      document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || err}</div>`;
     });
   });
 
@@ -527,25 +523,31 @@ function iniciarApp() {
   });
 
   function ejecutarCierreSesion() {
-    Object.keys(localStorage).forEach(function(key) { if (key.indexOf("msal.") === 0) localStorage.removeItem(key); });
-    Object.keys(sessionStorage).forEach(function(key) { if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key); });
+    // Para evitar conflictos en móviles, limpiamos localstorage y recargamos de forma forzada
+    Object.keys(localStorage).forEach(function(key) {
+      if (key.indexOf("msal.") === 0) localStorage.removeItem(key);
+    });
+    Object.keys(sessionStorage).forEach(function(key) {
+      if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
+    });
     window.location.reload();
   }
 
-  // ✅ ADQUISICIÓN INTERACTIVA POR POPUP SEGURO
+  // ✅ ADAPTACIÓN ROBUSTA PARA ADQUIRIR TOKENS EN MÓVILES
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { 
         return r.accessToken; 
       })
       .catch(function(err) {
-        console.warn("Llamado silencioso falló, saltando a popup:", err.message);
+        console.warn("Llamado silencioso falló, solicitando interacción:", err.message);
+        // Si falla el silencioso, usamos popup limpio controlado
         return msalInstance.acquireTokenPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
           .then(function(r) { return r.accessToken; });
       });
   }
 
-  window.obtenerToken = obtenerToken;
+  window.obtenerToken = obtenerToken; // Accesibilidad global
 
   function validarFiltroYPermisosUsuario() {
     var correoUsuario = (cuentaActual.username || "").toLowerCase();
@@ -593,7 +595,7 @@ function iniciarApp() {
             console.log("Acceso aprobado: Técnico autorizado.");
             mostrarAppPrincipal(true);
           } else {
-            alert("Acceso Denegado.\nTu cuenta (" + cuentaActual.username + ") no está autorizada en la lista blanca.");
+            alert("Acceso Denegado.\nTu cuenta de correo (" + cuentaActual.username + ") no está autorizada en la lista blanca del sistema.");
             ejecutarCierreSesion();
           }
         })
@@ -622,6 +624,8 @@ function iniciarApp() {
     document.getElementById("selProyecto").disabled = true;
     document.getElementById("selActividad").innerHTML = '<option value="">Elige un proyecto primero</option>';
     document.getElementById("selActividad").disabled = true;
+    document.getElementById("selEstacion").innerHTML = '<option value="">Elige una actividad primero</option>';
+    document.getElementById("selEstacion").disabled = true;
     document.getElementById("inpNotas").value = "";
     
     estructuraFotos.forEach(function(item) {
@@ -707,8 +711,8 @@ function iniciarApp() {
       guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
     }
     
-    var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value, a = document.getElementById("selActividad").value, e = "ESTACION_UNICA";
-    if (c && p && a) {
+    var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value, a = document.getElementById("selActividad").value, e = document.getElementById("selEstacion").value;
+    if (c && p && a && e) {
       var idLlaveSitioActual = (c + "___" + p + "___" + a + "___" + e).replace(/\s+/g, "_");
       ultimaEstacionSeleccionada = idLlaveSitioActual;
       
@@ -739,7 +743,7 @@ function iniciarApp() {
   document.getElementById("selCliente").addEventListener("change", function() {
     if (bloqueadorEventosDropdowns) return;
     var c = document.getElementById("selCliente").value; document.getElementById("selProyecto").innerHTML = '<option value="">Selecciona un proyecto</option>';
-    document.getElementById("selActividad").disabled = true; if (!c) { document.getElementById("selProyecto").disabled = true; return; }
+    document.getElementById("selActividad").disabled = document.getElementById("selEstacion").disabled = true; if (!c) { document.getElementById("selProyecto").disabled = true; return; }
     var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
     document.getElementById("selProyecto").innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     document.getElementById("selProyecto").disabled = false;
@@ -749,14 +753,24 @@ function iniciarApp() {
   document.getElementById("selProyecto").addEventListener("change", function() {
     if (bloqueadorEventosDropdowns) return;
     var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value; document.getElementById("selActividad").innerHTML = '<option value="">Selecciona una actividad</option>';
-    if (!p) { document.getElementById("selActividad").disabled = true; return; }
+    document.getElementById("selEstacion").disabled = true; if (!p) { document.getElementById("selActividad").disabled = true; return; }
     var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
     document.getElementById("selActividad").innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
     document.getElementById("selActividad").disabled = false;
     gestionarChangeDeEstacionProactivo();
   });
 
-  document.getElementById("selActividad").addEventListener("change", gestionarChangeDeEstacionProactivo);
+  document.getElementById("selActividad").addEventListener("change", function() {
+    if (bloqueadorEventosDropdowns) return;
+    var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value, a = document.getElementById("selActividad").value; document.getElementById("selEstacion").innerHTML = '<option value="">Selecciona una estación</option>';
+    if (!a) { document.getElementById("selEstacion").disabled = true; return; }
+    var e = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
+    document.getElementById("selEstacion").innerHTML += e.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
+    document.getElementById("selEstacion").disabled = false;
+    gestionarChangeDeEstacionProactivo();
+  });
+
+  document.getElementById("selEstacion").addEventListener("change", gestionarChangeDeEstacionProactivo);
 
   function renderizarBloqueFotosDinamicos() {
     var contenedor = document.getElementById("contenedorDinamicoBloquesFotos"); contenedor.innerHTML = "";
@@ -834,7 +848,7 @@ function iniciarApp() {
   function procesarArchivosCargados(files) {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado]; itemActual.estado = "TOMADA";
-      var est = document.getElementById("inpEstacion").value.trim() || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
+      var est = document.getElementById("selEstacion").value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
       files.forEach(function(f) {
         procesandoMarcasDeAgua++;
         estamparMarcaDeAgua(f, g, est, h, function(b) {
@@ -875,13 +889,11 @@ function iniciarApp() {
   function obtenerRutaCarpetaInspeccion() {
     var c = document.getElementById("selCliente").value || "CLIENTE_SITIO", p = document.getElementById("selProyecto").value || "PROYECTO_SITIO";
     var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
-    var est = document.getElementById("inpEstacion").value.trim() || "SITIO";
-    var ahoraHora = new Date().toTimeString().split(" ")[0].replace(/:/g, "-");
-    return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + limpiarNombre(est) + "_" + f + "_" + ahoraHora + "_" + limpiarNombre(t);
+    return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(document.getElementById("selEstacion").value || "SITIO") + "_" + limpiarNombre(t);
   }
 
   document.getElementById("btnGuardarFotosGlobal").addEventListener("click", function() {
-    if (!document.getElementById("selCliente").value || !document.getElementById("inpEstacion").value.trim() || !document.getElementById("inpTecnico").value.trim()) { alert("Faltan datos de ubicación, estación o técnico."); return; }
+    if (!document.getElementById("selCliente").value || !document.getElementById("selEstacion").value || !document.getElementById("inpTecnico").value.trim()) { alert("Faltan datos de ubicación o técnico."); return; }
     var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
     ov.classList.remove("oculto"); var rb = obtenerRutaCarpetaInspeccion();
 
@@ -914,7 +926,7 @@ function iniciarApp() {
   });
 
   document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
-    if (!document.getElementById("selCliente").value || !document.getElementById("inpEstacion").value.trim()) { alert("Configure la ubicación y la estación."); return; }
+    if (!document.getElementById("selCliente").value || !document.getElementById("selEstacion").value) { alert("Configure la ubicación."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Sincronizando aprobaciones del Supervisor...";
     var rb = obtenerRutaCarpetaInspeccion() + "/fotos";
@@ -936,11 +948,11 @@ function iniciarApp() {
   });
 
   document.getElementById("btnEnviar").addEventListener("click", function() {
-    if (!document.getElementById("selCliente").value || !document.getElementById("inpEstacion").value.trim() || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos de texto del formulario."); return; }
+    if (!document.getElementById("selCliente").value || !document.getElementById("selEstacion").value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos del técnico y ubicación."); return; }
     var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
     document.getElementById("estadoEnvioTexto").textContent = "Consolidando todo el material y generando libro Excel en la nube...";
     var rb = obtenerRutaCarpetaInspeccion();
-    var d = { cliente: document.getElementById("selCliente").value, proyecto: document.getElementById("selProyecto").value, actividad: document.getElementById("selActividad").value, estacion: document.getElementById("inpEstacion").value.trim(), tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notes: document.getElementById("inpNotas").value.trim() };
+    var d = { cliente: document.getElementById("selCliente").value, proyecto: document.getElementById("selProyecto").value, actividad: document.getElementById("selActividad").value, estacion: document.getElementById("selEstacion").value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notes: document.getElementById("inpNotas").value.trim() };
 
     obtenerToken().then(function(token) {
       if (!token) return;
@@ -975,7 +987,7 @@ function iniciarApp() {
           tx.objectStore("borradores_estaciones").delete(ultimaEstacionSeleccionada);
         }
         ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada y bitácora de 5 bloques generada de forma limpia.";
+        document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección guardada y bitácora de 5 bloques generada.";
       });
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
@@ -1137,6 +1149,8 @@ function iniciarApp() {
   function subirArchivo(token, ruta, contenido) {
     return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + ruta + ":/content", { method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" }, body: contenido }).then(function(r) { return r.json(); });
   }
+
+  function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
 }
