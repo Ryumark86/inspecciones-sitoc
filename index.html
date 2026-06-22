@@ -449,29 +449,38 @@ function iniciarApp() {
     else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
   }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
 
-  // 🛡️ ESCUDO 1: Control anti-atasco en el botón de Login principal
-  document.getElementById("btnLogin").addEventListener("click", function() {
-    if (msalInicializado) {
-      if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
-        sessionStorage.setItem("msal.interaction.status", "none");
-      }
+document.getElementById("btnLogin").addEventListener("click", function() {
+  if (!msalInicializado) {
+    alert("La librería de autenticación aún está cargando. Espera un momento e intenta de nuevo.");
+    return;
+  }
 
-      msalInstance.loginPopup({ scopes: SCOPES })
-        .then(function(respuesta) { 
-          cuentaActual = respuesta.account; 
-          inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); 
-        })
-        .catch(function(error) {
-          console.error("Error en login:", error);
-          if (error.message.includes("interaction_in_progress")) {
-            sessionStorage.setItem("msal.interaction.status", "none");
-            alert("El navegador retuvo una sesión previa. Por favor, toca de nuevo el botón de iniciar sesión.");
-          } else {
-            alert("Error de autenticación: " + error.message);
-          }
-        });
+  // Limpiar TODAS las claves de interacción que MSAL pueda dejar atascadas
+  Object.keys(sessionStorage).forEach(function(key) {
+    if (key.indexOf("msal.") === 0 || key.indexOf("msal-") === 0) {
+      sessionStorage.removeItem(key);
     }
   });
+  Object.keys(localStorage).forEach(function(key) {
+    if (key.indexOf("msal.interaction") !== -1) {
+      localStorage.removeItem(key);
+    }
+  });
+
+  msalInstance.loginPopup({ scopes: SCOPES })
+    .then(function(respuesta) {
+      cuentaActual = respuesta.account;
+      inicializarBaseDatosMultitarea().then(mostrarAppPrincipal);
+    })
+    .catch(function(error) {
+      console.error("Error en login:", error);
+      if (error.errorCode === "popup_window_error") {
+        alert("El navegador bloqueó la ventana emergente. Por favor, permite las ventanas emergentes para este sitio e intenta de nuevo.");
+      } else {
+        alert("Error de autenticación: " + error.message);
+      }
+    });
+});
 
   document.getElementById("btnLogout").addEventListener("click", function() { 
     if (msalInstance && cuentaActual) {
@@ -524,17 +533,18 @@ function iniciarApp() {
     document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
   });
 
-  // 🛡️ ESCUDO 2: Control anti-atasco en el refresco o validación automática de tokens
-  function obtenerToken() {
-    return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
-      .then(function(r) { return r.accessToken; })
-      .catch(function() { 
-        if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
-          sessionStorage.setItem("msal.interaction.status", "none");
-        }
-        return msalInstance.acquireTokenPopup({ scopes: SCOPES }); 
+ function obtenerToken() {
+  return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
+    .then(function(r) { return r.accessToken; })
+    .catch(function() {
+      // Limpiar estado atascado antes del popup de token también
+      Object.keys(sessionStorage).forEach(function(key) {
+        if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
       });
-  }
+      return msalInstance.acquireTokenPopup({ scopes: SCOPES, account: cuentaActual })
+        .then(function(r) { return r.accessToken; });
+    });
+}
 
   function mostrarAppPrincipal() {
     document.getElementById("pantallaLogin").classList.add("oculto");
