@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.5.2</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.6</title>
 <script>
 (function() {
   var urls = [
@@ -230,6 +230,7 @@ var CONFIG = {
   sitePath: "/sites/INSPECCIONES_EPCC",
   archivoConfiguracion: "configuracion.csv",
   archivoMaestro: "maestro_inspecciones.csv",
+  archivoTecnicosAutorizados: "tecnicos_autorizados.csv", // Archivo de control de acceso para externos
   carpetaRaizInspecciones: "Inspecciones"
 };
 
@@ -284,7 +285,6 @@ var datosConfiguracion = [];
 var estructuraFotos = [];
 var ultimaEstacionSeleccionada = "";
 var bloqueadorEventosDropdowns = false;
-// Se declara la variable GPS en el alcance global seguro
 var ubicacionCapturada = null;
 
 function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
@@ -444,7 +444,6 @@ function iniciarApp() {
   var msalInicializado = false;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
-  // Secuencialidad estricta para MSAL v2 en entornos web móviles
   msalInstance.initialize().then(function() {
     return msalInstance.handleRedirectPromise();
   }).then(function() {
@@ -452,7 +451,7 @@ function iniciarApp() {
     msalInicializado = true;
     if (cuentas.length > 0) { 
       cuentaActual = cuentas[0]; 
-      inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); 
+      inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario); 
     } else { 
       document.getElementById("pantallaLogin").classList.remove("oculto"); 
     }
@@ -466,27 +465,25 @@ function iniciarApp() {
       alert("La librería aún está cargando. Espera un momento e intenta de nuevo.");
       return;
     }
-
     Object.keys(sessionStorage).forEach(function(key) {
       if (key.indexOf("msal") !== -1) sessionStorage.removeItem(key);
     });
-
     msalInstance.loginPopup({ scopes: SCOPES })
       .then(function(respuesta) {
         cuentaActual = respuesta.account;
-        inicializarBaseDatosMultitarea().then(mostrarAppPrincipal);
+        inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
       })
       .catch(function(error) {
         console.error("Error en login:", error);
-        if (error.errorCode === "popup_window_error") {
-          alert("El navegador bloqueó el popup. Permite ventanas emergentes para este sitio.");
-        } else {
-          alert("Error de autenticación: " + error.message);
-        }
+        alert("Error de autenticación: " + error.message);
       });
   });
 
   document.getElementById("btnLogout").addEventListener("click", function() { 
+    ejecutarCierreSesion();
+  });
+
+  function ejecutarCierreSesion() {
     if (msalInstance && cuentaActual) {
       msalInstance.logoutRedirect({ 
         account: cuentaActual,
@@ -495,7 +492,64 @@ function iniciarApp() {
     } else {
       window.location.reload();
     }
-  });
+  }
+
+  // ✅ VALIDACIÓN FILTRADA DE ROLES Y AUTORIZACIONES (WHITELIST)
+  function validarFiltroYPermisosUsuario() {
+    var correoUsuario = (cuentaActual.username || "").toLowerCase();
+    var esCoordinadorSITOC = false;
+
+    // 1. Validar si pertenece al Tenant de la compañía o usa correo corporativo
+    if (cuentaActual.tenantId === CONFIG.tenantId || correoUsuario.endsWith("@sitoc.com") || correoUsuario.endsWith("@sitoc.com.co")) {
+      esCoordinadorSITOC = true;
+    }
+
+    if (esCoordinadorSITOC) {
+      console.log("Acceso concedido automáticamente: Coordinador Corporativo SITOC.");
+      document.getElementById("navSupervisor").classList.remove("oculto"); // Habilitar Escritorio
+      mostrarAppPrincipal(false); // Entra directo
+    } else {
+      // 2. Es una cuenta externa/personal. Procedemos a validar contra la Whitelist en SharePoint
+      console.log("Cuenta externa detectada. Validando autorización en lista blanca...");
+      document.getElementById("navSupervisor").classList.add("oculto"); // Forzar bloqueo de supervisión
+
+      resolverSitioYDrive()
+        .then(function() {
+          return obtenerToken();
+        })
+        .then(function(token) {
+          // Descargar archivo de autorizados
+          return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoTecnicosAutorizados + ":/content", { headers: { Authorization: "Bearer " + token } });
+        })
+        .then(function(r) {
+          if (!r.ok) throw new Error("No se pudo leer la lista de técnicos autorizados.");
+          return r.text();
+        })
+        .then(function(csvTexto) {
+          var lineas = csvTexto.split(/\r?\n/);
+          var autorizado = false;
+          for (var i = 0; i < lineas.length; i++) {
+            if (lineas[i].trim().toLowerCase() === correoUsuario) {
+              autorizado = true;
+              break;
+            }
+          }
+
+          if (autorizado) {
+            console.log("Acceso aprobado: Técnico externo autorizado.");
+            mostrarAppPrincipal(true); // Entra como personal restringido
+          } else {
+            alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.\n\nPor favor, solicita al Coordinador SITOC que registre tu correo.");
+            ejecutarCierreSesion();
+          }
+        })
+        .catch(function(err) {
+          console.error(err);
+          alert("Error de seguridad: No se pudo verificar tu autorización en SharePoint.\nDetalle: " + err.message);
+          ejecutarCierreSesion();
+        });
+    }
+  }
 
   document.getElementById("navCampo").addEventListener("click", function() {
     document.getElementById("navCampo").classList.add("btn-nav-active");
@@ -549,31 +603,19 @@ function iniciarApp() {
       });
   }
 
-  function mostrarAppPrincipal() {
+  function mostrarAppPrincipal(esPersonalExterno) {
     document.getElementById("pantallaLogin").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
     document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
     document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
 
-    var esCuentaPersonal = false;
-    if (cuentaActual.tenantId === "9188040d-6c67-4c5b-b112-36a304b66dad") {
-      esCuentaPersonal = true;
-    } else {
-      var uMin = (cuentaActual.username || "").toLowerCase();
-      if (uMin.endsWith("@outlook.com") || uMin.endsWith("@hotmail.com") || uMin.endsWith("@live.com")) {
-        esCuentaPersonal = true;
-      }
-    }
-
-    if (esCuentaPersonal) {
+    if (esPersonalExterno) {
       var btnSup = document.getElementById("navSupervisor");
       if (btnSup) btnSup.classList.add("oculto");
-      console.log("Acceso restrictivo: Cuenta personal de técnico. Panel de control bloqueado.");
     }
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function(pos) {
-        // Escritura limpia sobre el espacio global unificado
         ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
         document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
         document.getElementById("gpsStatusBar").classList.add("gps-success");
@@ -584,15 +626,20 @@ function iniciarApp() {
     renderizarBloqueFotosDinamicos();
     actualizarBandejaBorradoresUI();
 
+    // Si ya validó token para la lista blanca, resolverSitioYDrive ya se ejecutó con éxito.
     resolverSitioYDrive()
       .then(descargarYLeerConfiguracion)
       .then(function() {
         var btnBuscarSup = document.getElementById("btnCargarCarpetasActivas");
-        if (btnBuscarSup) { btnBuscarSup.disabled = false; btnBuscarSup.textContent = "🔄 Buscar Inspecciones Activas en SharePoint"; }
+        if (btnBuscarSup) { 
+          btnBuscarSup.disabled = esPersonalExterno; 
+          btnBuscarSup.textContent = esPersonalExterno ? "🔒 Panel restringido para externos" : "🔄 Buscar Inspecciones Activas en SharePoint"; 
+        }
       }).catch(function(e) { console.error(e); });
   }
 
   function resolverSitioYDrive() {
+    if (siteId && driveId) return Promise.resolve(); // Evitar llamados redundantes
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { return r.json(); })
@@ -608,9 +655,7 @@ function iniciarApp() {
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { 
-          if (!r.ok) {
-            throw new Error("Código de estado HTTP: " + r.status + " (" + r.statusText + ")");
-          }
+          if (!r.ok) throw new Error("Código de estado HTTP: " + r.status);
           return r.text(); 
         })
         .then(function(texto) {
@@ -625,7 +670,6 @@ function iniciarApp() {
         .catch(function(error) {
           console.error("Error al descargar configuración:", error);
           document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Error de comunicación con SharePoint</option>';
-          alert("Fallo al descargar listas de SharePoint.\nDetalle Técnico: " + error.message + "\n\nSoluciones:\n1. Revisa que el usuario tenga permisos en el SharePoint.\n2. Asegúrate que 'configuracion.csv' no fue renombrado.");
         });
     });
   }
