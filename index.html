@@ -121,6 +121,7 @@
   <h1>Inspecciones SITOC</h1>
   <p>Inicia sesión con tu cuenta de Microsoft (Corporativa o Personal Externo).</p>
   <button id="btnLogin">&#128274; Iniciar sesión con Microsoft</button>
+  <div id="loginError" style="margin-top:10px;"></div>
 </div>
 
 <div id="appPrincipal" class="oculto">
@@ -433,6 +434,24 @@ window.cargarBorradorEspecificoClick = function(idSitio) {
   };
 };
 
+function resolverSitioYDrive() {
+  if (siteId && driveId) return Promise.resolve();
+  return obtenerToken().then(function(token) {
+    if (!token) return;
+    return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
+      .then(function(r) { return r.json(); })
+      .then(function(sitio) {
+        siteId = sitio.id;
+        return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive", { headers: { Authorization: "Bearer " + token } });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(drive) { driveId = drive.id; });
+  });
+}
+
+var msalInstance = null;
+var cuentaActual = null;
+
 function iniciarApp() {
   // ✅ LIMPIEZA AGRESIVA DE CACHÉ DE POPUPS EN EL ARRANQUE
   Object.keys(localStorage).forEach(function(key) {
@@ -443,19 +462,22 @@ function iniciarApp() {
   });
 
   var msalConfig = {
-    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/common", redirectUri: CONFIG.redirectUri, validateAuthority: false },
+    auth: { 
+      clientId: CONFIG.clientId, 
+      // ✅ CAMBIO CLAVE A /organizations: Soporta cuentas corporativas y cuentas personales autorizadas como invitados
+      authority: "https://login.microsoftonline.com/organizations", 
+      redirectUri: CONFIG.redirectUri, 
+      validateAuthority: false 
+    },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
   };
 
-  var msalInstance = new msal.PublicClientApplication(msalConfig);
+  msalInstance = new msal.PublicClientApplication(msalConfig);
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
-  var cuentaActual = null;
   var msalInicializado = false;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
   msalInstance.initialize().then(function() {
-    return msalInstance.handleRedirectPromise();
-  }).then(function(tokenResponse) {
     msalInicializado = true;
     var cuentas = msalInstance.getAllAccounts();
     if (cuentas.length > 0) { 
@@ -469,12 +491,24 @@ function iniciarApp() {
     document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
 
+  // ✅ CAMBIADO DE REDIRECT A POPUP DEFINITIVO: Soluciona pantallas blancas y "Slow networks" en móviles
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (!msalInicializado) {
       alert("La librería aún está cargando. Espera un momento.");
       return;
     }
-    msalInstance.loginRedirect({ scopes: SCOPES });
+    msalInstance.loginPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
+      .then(function(loginResponse) {
+        var cuentas = msalInstance.getAllAccounts();
+        if (cuentas.length > 0) {
+          cuentaActual = cuentas[0];
+          document.getElementById("loginError").innerHTML = "";
+          inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
+        }
+      }).catch(function(err) {
+        console.error("Error en loginPopup:", err);
+        document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de ingreso: ${err.message}</div>`;
+      });
   });
 
   document.getElementById("btnLogout").addEventListener("click", function() { 
@@ -483,26 +517,33 @@ function iniciarApp() {
 
   function ejecutarCierreSesion() {
     if (msalInstance && cuentaActual) {
-      msalInstance.logoutRedirect({ 
+      msalInstance.logoutPopup({ 
         account: cuentaActual,
         postLogoutRedirectUri: CONFIG.redirectUri 
+      }).then(function() {
+        window.location.reload();
+      }).catch(function() {
+        window.location.reload();
       });
     } else {
       window.location.reload();
     }
   }
 
-  // ✅ CONTROL SILENCIOSO ADAPTADO A REDIRECCIÓN ESTRICTA
+  // ✅ CORREGIDO A ACQUIRETOKENPOPUP: Renovación invisible y robusta sin recargar la página
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { 
         return r.accessToken; 
       })
       .catch(function(err) {
-        console.warn("Llamado silencioso falló, saltando a redirección:", err.message);
-        msalInstance.acquireTokenRedirect({ scopes: SCOPES, account: cuentaActual });
+        console.warn("Llamado silencioso falló, saltando a popup:", err.message);
+        return msalInstance.acquireTokenPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
+          .then(function(r) { return r.accessToken; });
       });
   }
+
+  window.obtenerToken = obtenerToken; // Hace accesible la función globalmente para el resto del ciclo
 
   function validarFiltroYPermisosUsuario() {
     var correoUsuario = (cuentaActual.username || "").toLowerCase();
@@ -530,7 +571,7 @@ function iniciarApp() {
         })
         .then(function(r) {
           if (!r) return;
-          if (!r.ok) throw new Error("No se encontró el archivo de control en SharePoint.");
+          if (!r.ok) throw new Error("No se encontró el archivo de control técnicos_autorizados.csv en SharePoint.");
           return r.text();
         })
         .then(function(csvTexto) {
@@ -550,7 +591,7 @@ function iniciarApp() {
             console.log("Acceso aprobado: Técnico autorizado.");
             mostrarAppPrincipal(true);
           } else {
-            alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.");
+            alert("Acceso Denegado.\nTu cuenta de correo (" + cuentaActual.username + ") no está autorizada en la lista blanca del sistema.");
             ejecutarCierreSesion();
           }
         })
@@ -634,20 +675,6 @@ function iniciarApp() {
           btnBuscarSup.textContent = esPersonalExterno ? "🔒 Panel restringido para externos" : "🔄 Buscar Inspecciones Activas en SharePoint"; 
         }
       }).catch(function(e) { console.error(e); });
-  }
-
-  function resolverSitioYDrive() {
-    if (siteId && driveId) return Promise.resolve();
-    return obtenerToken().then(function(token) {
-      if (!token) return;
-      return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.json(); })
-        .then(function(sitio) {
-          siteId = sitio.id;
-          return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive", { headers: { Authorization: "Bearer " + token } });
-        }).then(function(r) { return r.json(); })
-        .then(function(drive) { driveId = drive.id; });
-    });
   }
 
   function descargarYLeerConfiguracion() {
@@ -855,7 +882,6 @@ function iniciarApp() {
     };
   }
 
-  function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
   function obtenerRutaCarpetaInspeccion() {
     var c = document.getElementById("selCliente").value || "CLIENTE_SITIO", p = document.getElementById("selProyecto").value || "PROYECTO_SITIO";
     var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
@@ -1120,23 +1146,12 @@ function iniciarApp() {
     return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + ruta + ":/content", { method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" }, body: contenido }).then(function(r) { return r.json(); });
   }
 
+  function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
+
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
 }
 
-function resolverSitioYDrive() {
-  if (siteId && driveId) return Promise.resolve();
-  return obtenerToken().then(function(token) {
-    if (!token) return;
-    return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
-      .then(function(r) { return r.json(); })
-      .then(function(sitio) {
-        siteId = sitio.id;
-        return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive", { headers: { Authorization: "Bearer " + token } });
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(drive) { driveId = drive.id; });
-  });
-}
+function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 
 function esperarMSAL(intentos) {
   if (typeof msal !== "undefined") { iniciarApp(); }
