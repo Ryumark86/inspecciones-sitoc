@@ -449,9 +449,29 @@ function iniciarApp() {
     else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
   }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
 
+  // Modifica esta sección dentro de iniciarApp()
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (msalInicializado) {
-      msalInstance.loginPopup({ scopes: SCOPES }).then(function(respuesta) { cuentaActual = respuesta.account; inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); });
+      // 🛠️ SOLUCIÓN: Si hay una interacción colgada en el caché del celular, la limpiamos antes de abrir el login
+      if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
+        sessionStorage.setItem("msal.interaction.status", "none");
+      }
+
+      msalInstance.loginPopup({ scopes: SCOPES })
+        .then(function(respuesta) { 
+          cuentaActual = respuesta.account; 
+          inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); 
+        })
+        .catch(function(error) {
+          console.error("Error en login:", error);
+          // Si vuelve a fallar por interacción en progreso, forzamos la limpieza en el catch
+          if (error.message.includes("interaction_in_progress")) {
+            sessionStorage.setItem("msal.interaction.status", "none");
+            alert("El navegador del celular retuvo una sesión previa. Por favor, toca el botón de iniciar sesión nuevamente.");
+          } else {
+            alert("Error de autenticación: " + error.message);
+          }
+        });
     }
   });
 
