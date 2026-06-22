@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.6.1</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.6.2</title>
 <script>
 (function() {
   var urls = [
@@ -495,7 +495,6 @@ function iniciarApp() {
     }
   }
 
-  // ✅ CORRECCIÓN CRÍTICA: Control de flujos asíncronos limpios sin gatillar Popups encadenados
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { 
@@ -503,11 +502,11 @@ function iniciarApp() {
       })
       .catch(function(err) {
         console.warn("Llamado silencioso falló, resolviendo contingencia de sesión:", err.message);
-        // Retorna el error hacia la pila para que se maneje de forma controlada sin reventar la app con popups anidados
         throw err;
       });
   }
 
+  // ✅ FLUJO CORREGIDO Y UNIFICADO SIN CORTES NI PUNTOS SUSPENSIVOS
   function validarFiltroYPermisosUsuario() {
     var correoUsuario = (cuentaActual.username || "").toLowerCase();
     var esCoordinadorSITOC = false;
@@ -524,7 +523,6 @@ function iniciarApp() {
       console.log("Cuenta externa detectada. Validando autorización en lista blanca...");
       document.getElementById("navSupervisor").classList.add("oculto");
 
-      // Usamos una llamada directa asíncrona limpia para leer el CSV desde Graph sin romper el estado del login
       resolverSitioYDrive()
         .then(function() {
           return obtenerToken();
@@ -536,30 +534,27 @@ function iniciarApp() {
           if (!r.ok) throw new Error("No se encontró el archivo de control en SharePoint.");
           return r.text();
         })
-       // ... (dentro de validarFiltroYPermisosUsuario)
-.then(function(csvTexto) {
-  // .replace(/\r/g, "") elimina el retorno de carro invisible que mete Excel
-  var lineas = csvTexto.replace(/\r/g, "").split("\n");
-  var autorizado = false;
-  
-  for (var i = 0; i < lineas.length; i++) {
-    // .trim() limpia cualquier espacio o residuo extraño al inicio o final
-    var lineaLimpia = lineas[i].trim().toLowerCase();
-    if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
-      autorizado = true;
-      break;
-    }
-  }
+        .then(function(csvTexto) {
+          // .replace(/\r/g, "") elimina el retorno de carro invisible que mete Excel
+          var lineas = csvTexto.replace(/\r/g, "").split("\n");
+          var autorizado = false;
+          
+          for (var i = 0; i < lineas.length; i++) {
+            var lineaLimpia = lineas[i].trim().toLowerCase();
+            if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
+              autorizado = true;
+              break;
+            }
+          }
 
-  if (autorizado) {
-    console.log("Acceso aprobado: Técnico externo autorizado.");
-    mostrarAppPrincipal(true);
-  } else {
-    alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.");
-    ejecutarCierreSesion();
-  }
-})
-// ...
+          if (autorizado) {
+            console.log("Acceso aprobado: Técnico externo autorizado.");
+            mostrarAppPrincipal(true);
+          } else {
+            alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.\n\nPor favor, solicita al Coordinador SITOC que registre tu correo.");
+            ejecutarCierreSesion();
+          }
+        })
         .catch(function(err) {
           console.error(err);
           alert("Error de validación: Comunícate con soporte de SITOC. Detalle: " + err.message);
@@ -1082,7 +1077,8 @@ function iniciarApp() {
               gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
             }
 
-            if (!archivo) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
+            // ✅ CORREGIDO: Clasificación correcta para la galería del supervisor
+            if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
           });
 
           Object.keys(gruposClasificados).forEach(function(nombreBloque) {
@@ -1124,7 +1120,6 @@ function iniciarApp() {
 
 function resolverSitioYDrive() {
   if (siteId && driveId) return Promise.resolve();
-  // Validación de contingencia aislada para los endpoints de Microsoft Graph
   var msalInstanceTmp = new msal.PublicClientApplication({
     auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/common" }
   });
