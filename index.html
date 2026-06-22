@@ -442,29 +442,46 @@ function iniciarApp() {
   var msalInicializado = false; var ubicacionCapturada = null;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
-  msalInstance.initialize().then(function() {
-    var cuentas = msalInstance.getAllAccounts();
-    msalInicializado = true;
-    if (cuentas.length > 0) { cuentaActual = cuentas[0]; inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); }
-    else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
-  }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
-
-document.getElementById("btnLogin").addEventListener("click", function() {
-  if (!msalInicializado) {
-    alert("La librería de autenticación aún está cargando. Espera un momento e intenta de nuevo.");
-    return;
-  }
-
-  // Limpiar TODAS las claves de interacción que MSAL pueda dejar atascadas
-  Object.keys(sessionStorage).forEach(function(key) {
-    if (key.indexOf("msal.") === 0 || key.indexOf("msal-") === 0) {
-      sessionStorage.removeItem(key);
-    }
+  // ✅ CLAVE: handleRedirectPromise limpia el estado interno de MSAL correctamente
+  msalInstance.handleRedirectPromise().catch(function() {}).finally(function() {
+    msalInstance.initialize().then(function() {
+      var cuentas = msalInstance.getAllAccounts();
+      msalInicializado = true;
+      if (cuentas.length > 0) { 
+        cuentaActual = cuentas[0]; 
+        inicializarBaseDatosMultitarea().then(mostrarAppPrincipal); 
+      } else { 
+        document.getElementById("pantallaLogin").classList.remove("oculto"); 
+      }
+    }).catch(function() { 
+      document.getElementById("pantallaLogin").classList.remove("oculto"); 
+    });
   });
-  Object.keys(localStorage).forEach(function(key) {
-    if (key.indexOf("msal.interaction") !== -1) {
-      localStorage.removeItem(key);
+
+  document.getElementById("btnLogin").addEventListener("click", function() {
+    if (!msalInicializado) {
+      alert("La librería aún está cargando. Espera un momento e intenta de nuevo.");
+      return;
     }
+
+    // Limpiar estado residual antes de intentar login
+    Object.keys(sessionStorage).forEach(function(key) {
+      if (key.indexOf("msal") !== -1) sessionStorage.removeItem(key);
+    });
+
+    msalInstance.loginPopup({ scopes: SCOPES })
+      .then(function(respuesta) {
+        cuentaActual = respuesta.account;
+        inicializarBaseDatosMultitarea().then(mostrarAppPrincipal);
+      })
+      .catch(function(error) {
+        console.error("Error en login:", error);
+        if (error.errorCode === "popup_window_error") {
+          alert("El navegador bloqueó el popup. Permite ventanas emergentes para este sitio.");
+        } else {
+          alert("Error de autenticación: " + error.message);
+        }
+      });
   });
 
   msalInstance.loginPopup({ scopes: SCOPES })
