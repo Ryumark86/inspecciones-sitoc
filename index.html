@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.3</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.4</title>
 <script>
 (function() {
   var urls = [
@@ -449,10 +449,8 @@ function iniciarApp() {
     else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
   }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
 
-  // Modifica esta sección dentro de iniciarApp()
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (msalInicializado) {
-      // 🛠️ SOLUCIÓN: Si hay una interacción colgada en el caché del celular, la limpiamos antes de abrir el login
       if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
         sessionStorage.setItem("msal.interaction.status", "none");
       }
@@ -464,7 +462,6 @@ function iniciarApp() {
         })
         .catch(function(error) {
           console.error("Error en login:", error);
-          // Si vuelve a fallar por interacción en progreso, forzamos la limpieza en el catch
           if (error.message.includes("interaction_in_progress")) {
             sessionStorage.setItem("msal.interaction.status", "none");
             alert("El navegador del celular retuvo una sesión previa. Por favor, toca el botón de iniciar sesión nuevamente.");
@@ -475,7 +472,6 @@ function iniciarApp() {
     }
   });
 
- // REEMPLAZA TU BLOQUE DE BTNLOGOUT POR ESTE:
   document.getElementById("btnLogout").addEventListener("click", function() { 
     if (msalInstance && cuentaActual) {
       msalInstance.logoutRedirect({ 
@@ -530,16 +526,21 @@ function iniciarApp() {
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { return r.accessToken; })
-      .catch(function() { return msalInstance.acquireTokenPopup({ scopes: SCOPES }); });
+      .catch(function() { 
+        // 🛡️ ESCUDO: Si el token silencioso falla y hay que abrir un popup en el celular, 
+        // limpiamos el estado atascado inmediatamente antes de llamarlo.
+        if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
+          sessionStorage.setItem("msal.interaction.status", "none");
+        }
+        return msalInstance.acquireTokenPopup({ scopes: SCOPES }); 
+      });
   }
-
   function mostrarAppPrincipal() {
     document.getElementById("pantallaLogin").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
     document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
     document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
 
-    // --- REGLA DE ACCESO HÍBRIDO (CORPORATIVO / PERSONAL) ---
     var esCuentaPersonal = false;
     if (cuentaActual.tenantId === "9188040d-6c67-4c5b-b112-36a304b66dad") {
       esCuentaPersonal = true;
@@ -588,7 +589,6 @@ function iniciarApp() {
     });
   }
 
-  // RESTRICCIÓN Y EVALUACIÓN DE ERRORES CON .CATCH PARA EL SELECT
   function descargarYLeerConfiguracion() {
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
@@ -758,7 +758,7 @@ function iniciarApp() {
   function procesarArchivosCargados(files) {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado]; itemActual.estado = "TOMADA";
-      var est = document.getElementById("selEstacion").value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
+      var est = document.getElementById("selEstacion").value || "SITIO GENERAL", g = ubicacionCaptured || "Sin GPS", h = new Date().toLocaleString();
       files.forEach(function(f) {
         procesandoMarcasDeAgua++;
         estamparMarcaDeAgua(f, g, est, h, function(b) {
@@ -980,6 +980,7 @@ function iniciarApp() {
 
   document.getElementById("selCarpetaMonitoreo").addEventListener("change", cargarGaleriaSupervisor);
 
+  // 🕵️‍♂️ LOGICA SUPERVISOR: CLASIFICACIÓN PRECISA POR BLOQUES EN VIVO
   function cargarGaleriaSupervisor() {
     var rutaFotos = document.getElementById("selCarpetaMonitoreo").value; 
     if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
@@ -994,6 +995,7 @@ function iniciarApp() {
           galeria.innerHTML = ""; 
           if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía en este sitio."; return; }
           
+          // Estructura de bloques sincronizada con los requerimientos exactos
           var gruposClasificados = {
             "BLOQUE 1: INSTALACIÓN DE ANTENAS": [],
             "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR": [],
@@ -1007,24 +1009,29 @@ function iniciarApp() {
             var nMin = archivo.name.toLowerCase();
             var asignado = false;
 
+            // Filtros de rastreo inteligente basados en la nomenclatura del archivo
             if (nMin.includes("antena") || nMin.includes("herraje") || nMin.includes("vista") || nMin.includes("encintado")) {
               gruposClasificados["BLOQUE 1: INSTALACIÓN DE ANTENAS"].push(archivo); asignado = true;
-            } else if (nMin.includes("cable_if") || nMin.includes("recorrido") || nMin.includes("escalerilla") || nMin.includes("pasamuros") || nMin.includes("rack") || nMin.includes("gabinete")) {
+            } else if (nMin.includes("cable_if") || nMin.includes("recorrido") || nMin.includes("escalerilla") || nMin.includes("pasamuros") || nMin.includes("rack") || nMin.includes("gabinete") || nMin.includes("curvatora") || nMin.includes("marquillas_de_los_cable")) {
               gruposClasificados["BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR"].push(archivo); asignado = true;
             } else if (nMin.includes("pdb") || nMin.includes("breaker") || nMin.includes("48v") || nMin.includes("0v") || nMin.includes("drenaje")) {
               gruposClasificados["BLOQUE 3: PDB"].push(archivo); asignado = true;
             } else if (nMin.includes("tierra") || nMin.includes("barraje") || nMin.includes("guaya")) {
               gruposClasificados["BLOQUE 4: SISTEMA PUESTA DE TIERRA"].push(archivo); asignado = true;
-            } else if (nMin.includes("idu") || nMin.includes("frontal") || nMin.includes("posterior") || nMin.includes("trasero")) {
+            } else if (nMin.includes("idu") || nMin.includes("frontal") || nMin.includes("posterior") || nMin.includes("trasero") || nMin.includes("derecho") || nMin.includes("izquierdo") || nMin.includes("marquilla_de_la_idu")) {
               gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
             }
 
-            if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
+            if (!asignado) { 
+              gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); 
+            }
           });
 
+          // Renderizar dinámicamente solo los bloques que contengan fotos cargadas
           Object.keys(gruposClasificados).forEach(function(nombreBloque) {
             var listaFotosBloque = gruposClasificados[nombreBloque];
             if (listaFotosBloque.length > 0) {
+              
               var tituloBloqueDiv = document.createElement("div");
               tituloBloqueDiv.className = "supervisor-bloque-header";
               tituloBloqueDiv.textContent = nombreBloque + " (" + listaFotosBloque.length + " fotos)";
