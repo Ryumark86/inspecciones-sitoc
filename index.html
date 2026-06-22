@@ -1086,11 +1086,10 @@ function resolverSitioYDrive() {
   }
 
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
-}
 
-function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
+ function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 
-function iniciarApp() {
+ function iniciarApp() {
 
   msalInstance = new msal.PublicClientApplication({
     auth: {
