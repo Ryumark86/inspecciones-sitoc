@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.7.2</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.7.3</title>
 <script>
 (function() {
   var urls = [
@@ -262,7 +262,7 @@ var MAESTRO_BLOQUES_PLANTILLA = [
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla horizontal - por tramos de escalerilla" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido e ingreso a pasamuros / gabinete" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido in escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla interior" },
-  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido en rack o gabinete y conexión a la IDU" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido en rack o gabinete and conexión a la IDU" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto de las marquillas de los cable IF conectados a la IDU" },
 
   { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica del PDB tapas cerradas" },
@@ -410,10 +410,7 @@ window.cargarBorradorEspecificoClick = function(idSitio) {
       document.getElementById("selActividad").innerHTML = '<option value="">Selecciona una actividad</option>' + aList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
       document.getElementById("selActividad").value = res.actividad; document.getElementById("selActividad").disabled = false;
 
-      var eList = uniques(datosConfiguracion.filter(function(f) { return f.cliente === res.cliente && f.proyecto === res.proyecto && f.actividad === res.actividad; }).map(function(f) { return f.estacion; }));
-      document.getElementById("selEstacion").innerHTML = '<option value="">Selecciona una estación</option>' + eList.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-      document.getElementById("selEstacion").value = res.estacion; document.getElementById("selEstacion").disabled = false;
-
+      document.getElementById("inpEstacion").value = res.estacion || "";
       document.getElementById("inpNotas").value = res.notes || "";
       ultimaEstacionSeleccionada = idSitio;
 
@@ -468,11 +465,10 @@ function iniciarApp() {
 
   msalInstance = new msal.PublicClientApplication(msalConfig);
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
-  var msalInicializado = false;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
+  // ✅ ARRANQUE PASIVO TOTAL: Evita llamar flujos interactivos o silent fallidos que lancen popups automáticos
   msalInstance.initialize().then(function() {
-    msalInicializado = true;
     var cuentas = msalInstance.getAllAccounts();
     if (cuentas.length > 0) { 
       cuentaActual = cuentas[0]; 
@@ -481,22 +477,21 @@ function iniciarApp() {
       document.getElementById("pantallaLogin").classList.remove("oculto"); 
     }
   }).catch(function(err) { 
-    console.error("Error en inicialización MSAL:", err);
+    console.error("Error en arranque MSAL:", err);
     document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
 
-  // ✅ BOTÓN DE LOGIN BLINDADO (EVITA DOBLE CLICK E INTERACTION_IN_PROGRESS)
+  // ✅ LOGIN POPUP UNIFICADO DISPARADO EXCLUSIVAMENTE POR EVENTO HUMANO (ELIMINA EL NESTED POPUP)
   document.getElementById("btnLogin").addEventListener("click", function() {
-    if (!msalInicializado) {
-      alert("La librería aún está cargando. Espera un momento.");
-      return;
-    }
-    
     var botonLogin = document.getElementById("btnLogin");
     var divError = document.getElementById("loginError");
 
     botonLogin.disabled = true;
     divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
+
+    // Limpiamos flags viejos de interacción para abrir canal limpio
+    Object.keys(localStorage).forEach(function(key) { if (key.includes("interaction.status")) localStorage.removeItem(key); });
+    Object.keys(sessionStorage).forEach(function(key) { if (key.includes("interaction.status")) sessionStorage.removeItem(key); });
 
     msalInstance.loginPopup({ 
       scopes: SCOPES, 
@@ -507,18 +502,11 @@ function iniciarApp() {
       cuentaActual = loginResponse.account;
       divError.innerHTML = "";
       botonLogin.disabled = false;
-      inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
+      return inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
     }).catch(function(err) {
       console.error("Error en loginPopup:", err);
       botonLogin.disabled = false;
-
-      if (err.message && err.message.includes("interaction_in_progress")) {
-        divError.innerHTML = `<div class="error-msg">⚠️ Había una solicitud colgada de un intento previo. El caché fue limpiado. ¡Dale clic de nuevo al botón!</div>`;
-        Object.keys(localStorage).forEach(function(key) { if (key.includes("interaction.status")) localStorage.removeItem(key); });
-        Object.keys(sessionStorage).forEach(function(key) { if (key.includes("interaction.status")) sessionStorage.removeItem(key); });
-      } else {
-        divError.innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || err}</div>`;
-      }
+      divError.innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || "Interrupción de red. Intenta nuevamente."}</div>`;
     });
   });
 
@@ -532,14 +520,14 @@ function iniciarApp() {
     window.location.reload();
   }
 
-  // ✅ ADQUISICIÓN INTERACTIVA POR POPUP SEGURO
+  // ✅ ADQUISICIÓN ROBUSTA DE TOKENS (SI EL SILENCIOSO FALLA LANZA POPUP MANUAL ASÍNCRONO)
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { 
         return r.accessToken; 
       })
       .catch(function(err) {
-        console.warn("Llamado silencioso falló, saltando a popup:", err.message);
+        console.warn("Silent falló, abriendo canal interactivo discreto:", err.message);
         return msalInstance.acquireTokenPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
           .then(function(r) { return r.accessToken; });
       });
@@ -556,11 +544,9 @@ function iniciarApp() {
     }
 
     if (esCoordinadorSITOC) {
-      console.log("Acceso concedido automáticamente: Coordinador SITOC.");
       document.getElementById("navSupervisor").classList.remove("oculto");
       mostrarAppPrincipal(false);
     } else {
-      console.log("Cuenta externa detectada. Rastreando autorización en lista blanca...");
       document.getElementById("navSupervisor").classList.add("oculto");
 
       resolverSitioYDrive()
@@ -573,7 +559,7 @@ function iniciarApp() {
         })
         .then(function(r) {
           if (!r) return;
-          if (!r.ok) throw new Error("No se encontró el archivo de control técnicos_autorizados.csv en SharePoint.");
+          if (!r.ok) throw new Error("No se encontró control técnicos_autorizados.csv");
           return r.text();
         })
         .then(function(csvTexto) {
@@ -590,16 +576,15 @@ function iniciarApp() {
           }
 
           if (autorizado) {
-            console.log("Acceso aprobado: Técnico autorizado.");
             mostrarAppPrincipal(true);
           } else {
-            alert("Acceso Denegado.\nTu cuenta (" + cuentaActual.username + ") no está autorizada en la lista blanca.");
+            alert("Acceso Denegado.\nTu cuenta no está en la lista blanca.");
             ejecutarCierreSesion();
           }
         })
         .catch(function(err) {
           console.error(err);
-          alert("Error de validación: Comunícate con soporte de SITOC. Detalle: " + err.message);
+          alert("Error de validación de credenciales corporativas: " + err.message);
           ejecutarCierreSesion();
         });
     }
@@ -622,6 +607,7 @@ function iniciarApp() {
     document.getElementById("selProyecto").disabled = true;
     document.getElementById("selActividad").innerHTML = '<option value="">Elige un proyecto primero</option>';
     document.getElementById("selActividad").disabled = true;
+    document.getElementById("inpEstacion").value = "";
     document.getElementById("inpNotas").value = "";
     
     estructuraFotos.forEach(function(item) {
