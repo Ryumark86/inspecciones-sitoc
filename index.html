@@ -461,13 +461,13 @@ function iniciarApp() {
     if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
   });
 
-  var msalConfig = {
+var msalConfig = {
     auth: { 
       clientId: CONFIG.clientId, 
-      // ✅ CAMBIO CLAVE A /organizations: Soporta cuentas corporativas y cuentas personales autorizadas como invitados
-      authority: "https://login.microsoftonline.com/organizations", 
+      // Usamos 'common' o el tenant específico para evitar el bucle de organizaciones anidadas
+      authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, 
       redirectUri: CONFIG.redirectUri, 
-      validateAuthority: false 
+      validateAuthority: true 
     },
     cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
   };
@@ -479,6 +479,8 @@ function iniciarApp() {
 
   msalInstance.initialize().then(function() {
     msalInicializado = true;
+    
+    // Verificamos si ya hay una sesión guardada en caché
     var cuentas = msalInstance.getAllAccounts();
     if (cuentas.length > 0) { 
       cuentaActual = cuentas[0]; 
@@ -491,24 +493,29 @@ function iniciarApp() {
     document.getElementById("pantallaLogin").classList.remove("oculto"); 
   });
 
-  // ✅ CAMBIADO DE REDIRECT A POPUP DEFINITIVO: Soluciona pantallas blancas y "Slow networks" en móviles
+  // ✅ CONTROLADOR DE POPUP UNIFICADO Y SEGURO (EVITA NESTED POPUPS)
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (!msalInicializado) {
       alert("La librería aún está cargando. Espera un momento.");
       return;
     }
-    msalInstance.loginPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
-      .then(function(loginResponse) {
-        var cuentas = msalInstance.getAllAccounts();
-        if (cuentas.length > 0) {
-          cuentaActual = cuentas[0];
-          document.getElementById("loginError").innerHTML = "";
-          inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
-        }
-      }).catch(function(err) {
-        console.error("Error en loginPopup:", err);
-        document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de ingreso: ${err.message}</div>`;
-      });
+    
+    document.getElementById("loginError").innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
+
+    msalInstance.loginPopup({ 
+      scopes: SCOPES, 
+      redirectUri: CONFIG.redirectUri,
+      prompt: "select_account" // Fuerza a elegir cuenta sin reabrir popups fantasma
+    })
+    .then(function(loginResponse) {
+      cuentaActual = loginResponse.account;
+      document.getElementById("loginError").innerHTML = "";
+      inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
+    }).catch(function(err) {
+      console.error("Error en loginPopup:", err);
+      // Si el usuario cierra el popup o se bloquea, limpiamos el estado
+      document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || err}</div>`;
+    });
   });
 
   document.getElementById("btnLogout").addEventListener("click", function() { 
@@ -516,34 +523,31 @@ function iniciarApp() {
   });
 
   function ejecutarCierreSesion() {
-    if (msalInstance && cuentaActual) {
-      msalInstance.logoutPopup({ 
-        account: cuentaActual,
-        postLogoutRedirectUri: CONFIG.redirectUri 
-      }).then(function() {
-        window.location.reload();
-      }).catch(function() {
-        window.location.reload();
-      });
-    } else {
-      window.location.reload();
-    }
+    // Para evitar conflictos en móviles, limpiamos localstorage y recargamos de forma forzada
+    Object.keys(localStorage).forEach(function(key) {
+      if (key.indexOf("msal.") === 0) localStorage.removeItem(key);
+    });
+    Object.keys(sessionStorage).forEach(function(key) {
+      if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
+    });
+    window.location.reload();
   }
 
-  // ✅ CORREGIDO A ACQUIRETOKENPOPUP: Renovación invisible y robusta sin recargar la página
+  // ✅ ADAPTACIÓN ROBUSTA PARA ADQUIRIR TOKENS EN MÓVILES
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { 
         return r.accessToken; 
       })
       .catch(function(err) {
-        console.warn("Llamado silencioso falló, saltando a popup:", err.message);
+        console.warn("Llamado silencioso falló, solicitando interacción:", err.message);
+        // Si falla el silencioso, usamos popup limpio controlado
         return msalInstance.acquireTokenPopup({ scopes: SCOPES, redirectUri: CONFIG.redirectUri })
           .then(function(r) { return r.accessToken; });
       });
   }
 
-  window.obtenerToken = obtenerToken; // Hace accesible la función globalmente para el resto del ciclo
+  window.obtenerToken = obtenerToken; // Accesibilidad global
 
   function validarFiltroYPermisosUsuario() {
     var correoUsuario = (cuentaActual.username || "").toLowerCase();
