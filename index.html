@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.4</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.5</title>
 <script>
 (function() {
   var urls = [
@@ -255,7 +255,7 @@ var MAESTRO_BLOQUES_PLANTILLA = [
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica de la curvatora de la escalerilla vertical a horizontal" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla horizontal - por tramos de escalerilla" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido e ingreso a pasamuros / gabinete" },
-  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla interior" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido in escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla interior" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido en rack o gabinete y conexión a la IDU" },
   { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto de las marquillas de los cable IF conectados a la IDU" },
 
@@ -449,6 +449,7 @@ function iniciarApp() {
     else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
   }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
 
+  // 🛡️ ESCUDO 1: Control anti-atasco en el botón de Login principal
   document.getElementById("btnLogin").addEventListener("click", function() {
     if (msalInicializado) {
       if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
@@ -464,7 +465,7 @@ function iniciarApp() {
           console.error("Error en login:", error);
           if (error.message.includes("interaction_in_progress")) {
             sessionStorage.setItem("msal.interaction.status", "none");
-            alert("El navegador del celular retuvo una sesión previa. Por favor, toca el botón de iniciar sesión nuevamente.");
+            alert("El navegador retuvo una sesión previa. Por favor, toca de nuevo el botón de iniciar sesión.");
           } else {
             alert("Error de autenticación: " + error.message);
           }
@@ -523,18 +524,18 @@ function iniciarApp() {
     document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
   });
 
+  // 🛡️ ESCUDO 2: Control anti-atasco en el refresco o validación automática de tokens
   function obtenerToken() {
     return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
       .then(function(r) { return r.accessToken; })
       .catch(function() { 
-        // 🛡️ ESCUDO: Si el token silencioso falla y hay que abrir un popup en el celular, 
-        // limpiamos el estado atascado inmediatamente antes de llamarlo.
         if (sessionStorage.getItem("msal.interaction.status") === "interaction_in_progress") {
           sessionStorage.setItem("msal.interaction.status", "none");
         }
         return msalInstance.acquireTokenPopup({ scopes: SCOPES }); 
       });
   }
+
   function mostrarAppPrincipal() {
     document.getElementById("pantallaLogin").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
@@ -758,7 +759,7 @@ function iniciarApp() {
   function procesarArchivosCargados(files) {
     if (files.length > 0 && indiceItemSeleccionado !== null) {
       var itemActual = estructuraFotos[indiceItemSeleccionado]; itemActual.estado = "TOMADA";
-      var est = document.getElementById("selEstacion").value || "SITIO GENERAL", g = ubicacionCaptured || "Sin GPS", h = new Date().toLocaleString();
+      var est = document.getElementById("selEstacion").value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
       files.forEach(function(f) {
         procesandoMarcasDeAgua++;
         estamparMarcaDeAgua(f, g, est, h, function(b) {
@@ -980,7 +981,7 @@ function iniciarApp() {
 
   document.getElementById("selCarpetaMonitoreo").addEventListener("change", cargarGaleriaSupervisor);
 
-  // 🕵️‍♂️ LOGICA SUPERVISOR: CLASIFICACIÓN PRECISA POR BLOQUES EN VIVO
+  // 🕵️‍♂️ MODO ESCRITORIO: Organización estricta de fotos recibidas por bloques de ingeniería
   function cargarGaleriaSupervisor() {
     var rutaFotos = document.getElementById("selCarpetaMonitoreo").value; 
     if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
@@ -995,7 +996,6 @@ function iniciarApp() {
           galeria.innerHTML = ""; 
           if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía en este sitio."; return; }
           
-          // Estructura de bloques sincronizada con los requerimientos exactos
           var gruposClasificados = {
             "BLOQUE 1: INSTALACIÓN DE ANTENAS": [],
             "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR": [],
@@ -1009,7 +1009,6 @@ function iniciarApp() {
             var nMin = archivo.name.toLowerCase();
             var asignado = false;
 
-            // Filtros de rastreo inteligente basados en la nomenclatura del archivo
             if (nMin.includes("antena") || nMin.includes("herraje") || nMin.includes("vista") || nMin.includes("encintado")) {
               gruposClasificados["BLOQUE 1: INSTALACIÓN DE ANTENAS"].push(archivo); asignado = true;
             } else if (nMin.includes("cable_if") || nMin.includes("recorrido") || nMin.includes("escalerilla") || nMin.includes("pasamuros") || nMin.includes("rack") || nMin.includes("gabinete") || nMin.includes("curvatora") || nMin.includes("marquillas_de_los_cable")) {
@@ -1022,16 +1021,12 @@ function iniciarApp() {
               gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
             }
 
-            if (!asignado) { 
-              gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); 
-            }
+            if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
           });
 
-          // Renderizar dinámicamente solo los bloques que contengan fotos cargadas
           Object.keys(gruposClasificados).forEach(function(nombreBloque) {
             var listaFotosBloque = gruposClasificados[nombreBloque];
             if (listaFotosBloque.length > 0) {
-              
               var tituloBloqueDiv = document.createElement("div");
               tituloBloqueDiv.className = "supervisor-bloque-header";
               tituloBloqueDiv.textContent = nombreBloque + " (" + listaFotosBloque.length + " fotos)";
