@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.6</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.6.1</title>
 <script>
 (function() {
   var urls = [
@@ -230,7 +230,7 @@ var CONFIG = {
   sitePath: "/sites/INSPECCIONES_EPCC",
   archivoConfiguracion: "configuracion.csv",
   archivoMaestro: "maestro_inspecciones.csv",
-  archivoTecnicosAutorizados: "tecnicos_autorizados.csv", // Archivo de control de acceso para externos
+  archivoTecnicosAutorizados: "tecnicos_autorizados.csv",
   carpetaRaizInspecciones: "Inspecciones"
 };
 
@@ -286,6 +286,7 @@ var estructuraFotos = [];
 var ultimaEstacionSeleccionada = "";
 var bloqueadorEventosDropdowns = false;
 var ubicacionCapturada = null;
+var siteId = null; var driveId = null;
 
 function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
@@ -440,7 +441,7 @@ function iniciarApp() {
 
   var msalInstance = new msal.PublicClientApplication(msalConfig);
   var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
-  var cuentaActual = null; var siteId = null; var driveId = null;
+  var cuentaActual = null;
   var msalInicializado = false;
   var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
 
@@ -494,42 +495,53 @@ function iniciarApp() {
     }
   }
 
-  // ✅ VALIDACIÓN FILTRADA DE ROLES Y AUTORIZACIONES (WHITELIST)
+  // ✅ CORRECCIÓN CRÍTICA: Control de flujos asíncronos limpios sin gatillar Popups encadenados
+  function obtenerToken() {
+    return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
+      .then(function(r) { 
+        return r.accessToken; 
+      })
+      .catch(function(err) {
+        console.warn("Llamado silencioso falló, resolviendo contingencia de sesión:", err.message);
+        // Retorna el error hacia la pila para que se maneje de forma controlada sin reventar la app con popups anidados
+        throw err;
+      });
+  }
+
   function validarFiltroYPermisosUsuario() {
     var correoUsuario = (cuentaActual.username || "").toLowerCase();
     var esCoordinadorSITOC = false;
 
-    // 1. Validar si pertenece al Tenant de la compañía o usa correo corporativo
     if (cuentaActual.tenantId === CONFIG.tenantId || correoUsuario.endsWith("@sitoc.com") || correoUsuario.endsWith("@sitoc.com.co")) {
       esCoordinadorSITOC = true;
     }
 
     if (esCoordinadorSITOC) {
       console.log("Acceso concedido automáticamente: Coordinador Corporativo SITOC.");
-      document.getElementById("navSupervisor").classList.remove("oculto"); // Habilitar Escritorio
-      mostrarAppPrincipal(false); // Entra directo
+      document.getElementById("navSupervisor").classList.remove("oculto");
+      mostrarAppPrincipal(false);
     } else {
-      // 2. Es una cuenta externa/personal. Procedemos a validar contra la Whitelist en SharePoint
       console.log("Cuenta externa detectada. Validando autorización en lista blanca...");
-      document.getElementById("navSupervisor").classList.add("oculto"); // Forzar bloqueo de supervisión
+      document.getElementById("navSupervisor").classList.add("oculto");
 
+      // Usamos una llamada directa asíncrona limpia para leer el CSV desde Graph sin romper el estado del login
       resolverSitioYDrive()
         .then(function() {
           return obtenerToken();
         })
         .then(function(token) {
-          // Descargar archivo de autorizados
           return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoTecnicosAutorizados + ":/content", { headers: { Authorization: "Bearer " + token } });
         })
         .then(function(r) {
-          if (!r.ok) throw new Error("No se pudo leer la lista de técnicos autorizados.");
+          if (!r.ok) throw new Error("No se encontró el archivo de control en SharePoint.");
           return r.text();
         })
         .then(function(csvTexto) {
           var lineas = csvTexto.split(/\r?\n/);
           var autorizado = false;
           for (var i = 0; i < lineas.length; i++) {
-            if (lineas[i].trim().toLowerCase() === correoUsuario) {
+            var lineaLimpia = lineas[i].trim().toLowerCase();
+            if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
               autorizado = true;
               break;
             }
@@ -537,7 +549,7 @@ function iniciarApp() {
 
           if (autorizado) {
             console.log("Acceso aprobado: Técnico externo autorizado.");
-            mostrarAppPrincipal(true); // Entra como personal restringido
+            mostrarAppPrincipal(true);
           } else {
             alert("Acceso Denegado.\nTu cuenta personal (" + cuentaActual.username + ") no está autorizada en el sistema.\n\nPor favor, solicita al Coordinador SITOC que registre tu correo.");
             ejecutarCierreSesion();
@@ -545,7 +557,7 @@ function iniciarApp() {
         })
         .catch(function(err) {
           console.error(err);
-          alert("Error de seguridad: No se pudo verificar tu autorización en SharePoint.\nDetalle: " + err.message);
+          alert("Error de validación: Comunícate con soporte de SITOC. Detalle: " + err.message);
           ejecutarCierreSesion();
         });
     }
@@ -591,18 +603,6 @@ function iniciarApp() {
     document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
   });
 
-  function obtenerToken() {
-    return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
-      .then(function(r) { return r.accessToken; })
-      .catch(function() {
-        Object.keys(sessionStorage).forEach(function(key) {
-          if (key.indexOf("msal.") === 0) sessionStorage.removeItem(key);
-        });
-        return msalInstance.acquireTokenPopup({ scopes: SCOPES })
-          .then(function(r) { return r.accessToken; });
-      });
-  }
-
   function mostrarAppPrincipal(esPersonalExterno) {
     document.getElementById("pantallaLogin").classList.add("oculto");
     document.getElementById("appPrincipal").classList.remove("oculto");
@@ -626,7 +626,6 @@ function iniciarApp() {
     renderizarBloqueFotosDinamicos();
     actualizarBandejaBorradoresUI();
 
-    // Si ya validó token para la lista blanca, resolverSitioYDrive ya se ejecutó con éxito.
     resolverSitioYDrive()
       .then(descargarYLeerConfiguracion)
       .then(function() {
@@ -639,7 +638,7 @@ function iniciarApp() {
   }
 
   function resolverSitioYDrive() {
-    if (siteId && driveId) return Promise.resolve(); // Evitar llamados redundantes
+    if (siteId && driveId) return Promise.resolve();
     return obtenerToken().then(function(token) {
       return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
         .then(function(r) { return r.json(); })
@@ -1078,7 +1077,7 @@ function iniciarApp() {
               gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
             }
 
-            if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
+            if (!archivo) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
           });
 
           Object.keys(gruposClasificados).forEach(function(nombreBloque) {
@@ -1116,6 +1115,30 @@ function iniciarApp() {
   }
 
   document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
+}
+
+function resolverSitioYDrive() {
+  if (siteId && driveId) return Promise.resolve();
+  // Validación de contingencia aislada para los endpoints de Microsoft Graph
+  var msalInstanceTmp = new msal.PublicClientApplication({
+    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/common" }
+  });
+  var cuenta = msalInstanceTmp.getAllAccounts()[0];
+  return msalInstanceTmp.acquireTokenSilent({ scopes: ["User.Read", "Sites.ReadWrite.All"], account: cuenta })
+    .then(function(r) {
+      return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + r.accessToken } });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(sitio) {
+      siteId = sitio.id;
+      var cuenta2 = msalInstanceTmp.getAllAccounts()[0];
+      return msalInstanceTmp.acquireTokenSilent({ scopes: ["User.Read", "Sites.ReadWrite.All"], account: cuenta2 });
+    })
+    .then(function(r) {
+      return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive", { headers: { Authorization: "Bearer " + r.accessToken } });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(drive) { driveId = drive.id; });
 }
 
 function esperarMSAL(intentos) {
