@@ -458,10 +458,10 @@ function resolverSitioYDrive() {
   });
 }
 
-// ✅ ADQUISICIÓN DE TOKENS AJUSTADA PARA SPA REDIRECT NATIVO
+// ✅ REESTRUCTURACIÓN DE ADQUISICIÓN DE TOKENS (EVITA BUCLES DE REDIRECCIÓN)
 async function obtenerToken() {
   if (!cuentaActual) {
-    throw new Error("No autenticado");
+    throw new Error("No hay una cuenta activa autenticada.");
   }
   try {
     const resp = await msalInstance.acquireTokenSilent({
@@ -470,14 +470,13 @@ async function obtenerToken() {
     });
     return resp.accessToken;
   } catch (err) {
-    console.warn("Silent falló de forma transparente, intentando interactivo...");
-    // En flujo SPA redirect redirige limpiamente de ser necesario
-    msalInstance.loginRedirect({ scopes: SCOPES });
-    throw new Error("Renovando token por redirección");
+    console.warn("Silent falló. Intentando interactivo controlado...", err.message);
+    throw new Error("Se requiere renovación de credenciales: " + err.message);
   }
 }
 window.obtenerToken = obtenerToken;
 
+// ✅ VALIDACIÓN BLINDADA: EVITA SACAR AL USUARIO SI FALLA LA CONEXIÓN CON SHAREPOINT
 function validarFiltroYPermisosUsuario() {
   var correoUsuario = (cuentaActual.username || "").toLowerCase();
   var esCoordinadorSITOC = false;
@@ -487,11 +486,8 @@ function validarFiltroYPermisosUsuario() {
   }
 
   if (esCoordinadorSITOC) {
-    document.getElementById("navSupervisor").classList.remove("oculto");
     mostrarAppPrincipal(false);
   } else {
-    document.getElementById("navSupervisor").classList.add("oculto");
-
     resolverSitioYDrive()
       .then(function() {
         return obtenerToken();
@@ -502,7 +498,9 @@ function validarFiltroYPermisosUsuario() {
       })
       .then(function(r) {
         if (!r) return;
-        if (!r.ok) throw new Error("No se encontró control técnicos_autorizados.csv");
+        if (!r.ok) {
+          throw new Error("SharePoint respondió con código " + r.status + " al leer técnicos autorizados.");
+        }
         return r.text();
       })
       .then(function(csvTexto) {
@@ -521,14 +519,19 @@ function validarFiltroYPermisosUsuario() {
         if (autorizado) {
           mostrarAppPrincipal(true);
         } else {
-          alert("Acceso Denegado.\nTu cuenta no está en la lista blanca.");
-          ejecutarCierreSesion();
+          document.getElementById("loginError").innerHTML = `<div class="error-msg"><strong>Acceso Denegado:</strong> El correo <u>${correoUsuario}</u> no se encuentra registrado en el archivo tecnicos_autorizados.csv dentro de SharePoint.</div>`;
+          document.getElementById("pantallaLogin").classList.remove("oculto");
+          document.getElementById("appPrincipal").classList.add("oculto");
         }
       })
       .catch(function(err) {
         console.error(err);
-        alert("Error de validación de credenciales corporativas: " + err.message);
-        ejecutarCierreSesion();
+        alert("⚠️ ATENCIÓN - ERROR DE COMUNICACIÓN CON SHAREPOINT:\n\n" + err.message + "\n\nVerifica que tu usuario tenga permisos de lectura en la carpeta del sitio.");
+        
+        document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de sincronización con SharePoint: ${err.message}</div>`;
+        document.getElementById("pantallaLogin").classList.remove("oculto");
+        document.getElementById("appPrincipal").classList.add("oculto");
+        document.getElementById("btnLogin").disabled = false;
       });
   }
 }
@@ -960,6 +963,7 @@ function cargarGaleriaSupervisor() {
   });
 }
 
+// ✅ PARCHE CRÍTICO APLICADO: EVITA BUCLES MSTRANDO LA UI ANTES DE LLAMAR A SHAREPOINT
 function mostrarAppPrincipal(esPersonalExterno) {
   document.getElementById("pantallaLogin").classList.add("oculto");
   document.getElementById("appPrincipal").classList.remove("oculto");
@@ -969,6 +973,8 @@ function mostrarAppPrincipal(esPersonalExterno) {
   if (esPersonalExterno) {
     var btnSup = document.getElementById("navSupervisor");
     if (btnSup) btnSup.classList.add("oculto");
+  } else {
+    document.getElementById("navSupervisor").classList.remove("oculto");
   }
 
   if (navigator.geolocation) {
@@ -976,13 +982,17 @@ function mostrarAppPrincipal(esPersonalExterno) {
       ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
       document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
       document.getElementById("gpsStatusBar").classList.add("gps-success");
-    }, null, { enableHighAccuracy: true });
+    }, function(err) {
+      console.warn("No se pudo obtener GPS:", err.message);
+      document.getElementById("gpsStatusTexto").textContent = "⚠️ GPS no disponible temporalmente";
+    }, { enableHighAccuracy: true, timeout: 10000 });
   }
 
   estructuraFotos = MAESTRO_BLOQUES_PLANTILLA.map(function(b) { return { bNom: b.bNom, subNom: b.subNom, item: b.item, estado: "PENDIENTE", fotosList: [] }; });
   renderizarBloqueFotosDinamicos();
   actualizarBandejaBorradoresUI();
 
+  // Llamadas asíncronas controladas (Si fallan, la interfaz no se cierra)
   resolverSitioYDrive()
     .then(descargarYLeerConfiguracion)
     .then(function() {
@@ -991,7 +1001,10 @@ function mostrarAppPrincipal(esPersonalExterno) {
         btnBuscarSup.disabled = esPersonalExterno; 
         btnBuscarSup.textContent = esPersonalExterno ? "🔒 Panel restringido para externos" : "🔄 Buscar Inspecciones Activas en SharePoint"; 
       }
-    }).catch(function(e) { console.error(e); });
+    }).catch(function(e) { 
+      console.error("Fallo controlado en SharePoint:", e);
+      alert("⚠️ AVISO DE CONFIGURACIÓN:\nLa sesión inició correctamente, pero no se pudieron descargar las listas desde SharePoint.\n\nDetalle: " + e.message + "\n\nVerifica que tu cuenta tenga acceso al sitio '/sites/INSPECCIONES_EPCC'.");
+    });
 }
 
 function descargarYLeerConfiguracion() {
@@ -1041,7 +1054,6 @@ function iniciarApp() {
   msalInstance.initialize().then(function () {
     inicializarEventosFormulario();
 
-    // Captura la respuesta asíncrona cuando Microsoft devuelve al usuario a la página
     msalInstance.handleRedirectPromise().then(function (resp) {
       if (resp !== null) {
         cuentaActual = resp.account;
@@ -1065,7 +1077,6 @@ function iniciarApp() {
     console.error("Fallo inicializando MSAL:", err);
   });
 
-  // Evento Clic del Botón de Login migrado a Redirección Nativa (100% compatible con Smartphones)
   document.getElementById("btnLogin").addEventListener("click", function () {
     var botonLogin = document.getElementById("btnLogin");
     var divError = document.getElementById("loginError");
@@ -1091,9 +1102,10 @@ function iniciarApp() {
   });
 }
 
+// ✅ CORRECCIÓN EN CIERRE DE SESIÓN: MIGRADO A REDIRECT PARA EVITAR POPUPS DE LOGOUT
 function ejecutarCierreSesion() {
   if (msalInstance) {
-    msalInstance.logoutPopup().finally(() => {
+    msalInstance.logoutRedirect().catch(function() {
       limpiarCacheMSAL();
     });
   } else {
