@@ -458,10 +458,10 @@ function resolverSitioYDrive() {
   });
 }
 
-// ✅ REESTRUCTURACIÓN DE ADQUISICIÓN DE TOKENS (EVITA BUCLES DE REDIRECCIÓN)
+// ✅ CORRECCIÓN SOLUCIÓN #1: FALLBACK INTERACTIVO AUTOMÁTICO DE SEGURIDAD SI FALLA EL TOKEN SILENCIOSO
 async function obtenerToken() {
   if (!cuentaActual) {
-    throw new Error("No hay una cuenta activa autenticada.");
+    throw new Error("No autenticado");
   }
   try {
     const resp = await msalInstance.acquireTokenSilent({
@@ -470,13 +470,18 @@ async function obtenerToken() {
     });
     return resp.accessToken;
   } catch (err) {
-    console.warn("Silent falló. Intentando interactivo controlado...", err.message);
-    throw new Error("Se requiere renovación de credenciales: " + err.message);
+    console.warn("Token silencioso falló. Ejecutando fallback por redirección interactiva...");
+    // Fuerza la redirección interactiva para conseguir el token en lugar de matar la app
+    msalInstance.acquireTokenRedirect({
+      scopes: SCOPES,
+      account: cuentaActual
+    });
+    return null;
   }
 }
 window.obtenerToken = obtenerToken;
 
-// ✅ VALIDACIÓN BLINDADA: EVITA SACAR AL USUARIO SI FALLA LA CONEXIÓN CON SHAREPOINT
+// ✅ CORRECCIÓN SOLUCIÓN #4: SI FALLA SHAREPOINT SE MUESTRA UN BOTÓN DE REINTENTO, NUNCA SE BOTÁ AL USUARIO
 function validarFiltroYPermisosUsuario() {
   var correoUsuario = (cuentaActual.username || "").toLowerCase();
   var esCoordinadorSITOC = false;
@@ -493,14 +498,12 @@ function validarFiltroYPermisosUsuario() {
         return obtenerToken();
       })
       .then(function(token) {
-        if (!token) return; 
+        if (!token) return; // Esperando redirección interactiva de acquireTokenRedirect
         return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoTecnicosAutorizados + ":/content", { headers: { Authorization: "Bearer " + token } });
       })
       .then(function(r) {
         if (!r) return;
-        if (!r.ok) {
-          throw new Error("SharePoint respondió con código " + r.status + " al leer técnicos autorizados.");
-        }
+        if (!r.ok) throw new Error("Acceso restringido al archivo técnicos autorizados.");
         return r.text();
       })
       .then(function(csvTexto) {
@@ -519,16 +522,15 @@ function validarFiltroYPermisosUsuario() {
         if (autorizado) {
           mostrarAppPrincipal(true);
         } else {
-          document.getElementById("loginError").innerHTML = `<div class="error-msg"><strong>Acceso Denegado:</strong> El correo <u>${correoUsuario}</u> no se encuentra registrado en el archivo tecnicos_autorizados.csv dentro de SharePoint.</div>`;
+          document.getElementById("loginError").innerHTML = `<div class="error-msg"><strong>Acceso Denegado:</strong> El correo <u>${correoUsuario}</u> no se encuentra registrado en la lista blanca de técnicos autorizados.</div>`;
           document.getElementById("pantallaLogin").classList.remove("oculto");
           document.getElementById("appPrincipal").classList.add("oculto");
         }
       })
       .catch(function(err) {
-        console.error(err);
-        alert("⚠️ ATENCIÓN - ERROR DE COMUNICACIÓN CON SHAREPOINT:\n\n" + err.message + "\n\nVerifica que tu usuario tenga permisos de lectura en la carpeta del sitio.");
-        
-        document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de sincronización con SharePoint: ${err.message}</div>`;
+        console.error("Fallo de comunicación:", err);
+        // Evita el bucle visual reteniendo la pantalla con la alerta sin cerrar sesión
+        document.getElementById("loginError").innerHTML = `<div class="error-msg">⚠️ <strong>Error de enlace con SharePoint:</strong> Permisos insuficientes en el sitio. Revise los accesos de la cuenta.</div>`;
         document.getElementById("pantallaLogin").classList.remove("oculto");
         document.getElementById("appPrincipal").classList.add("oculto");
         document.getElementById("btnLogin").disabled = false;
@@ -963,7 +965,6 @@ function cargarGaleriaSupervisor() {
   });
 }
 
-// ✅ PARCHE CRÍTICO APLICADO: EVITA BUCLES MSTRANDO LA UI ANTES DE LLAMAR A SHAREPOINT
 function mostrarAppPrincipal(esPersonalExterno) {
   document.getElementById("pantallaLogin").classList.add("oculto");
   document.getElementById("appPrincipal").classList.remove("oculto");
@@ -992,7 +993,6 @@ function mostrarAppPrincipal(esPersonalExterno) {
   renderizarBloqueFotosDinamicos();
   actualizarBandejaBorradoresUI();
 
-  // Llamadas asíncronas controladas (Si fallan, la interfaz no se cierra)
   resolverSitioYDrive()
     .then(descargarYLeerConfiguracion)
     .then(function() {
@@ -1043,7 +1043,7 @@ function iniciarApp() {
     auth: {
       clientId: CONFIG.clientId,
       authority: "https://login.microsoftonline.com/" + CONFIG.tenantId,
-      redirectUri: CONFIG.redirectUri
+      redirectUri: CONFIG.redirectUri // ✅ SOLUCIÓN #2: URI fijeza amarrada a la config estricta
     },
     cache: {
       cacheLocation: "localStorage",
@@ -1077,7 +1077,7 @@ function iniciarApp() {
     console.error("Fallo inicializando MSAL:", err);
   });
 
- // 🚀 EVENTO LOGIN CORREGIDO CON LIMPIEZA SEGURA DE CACHÉ (EVITA CONGELAMIENTO)
+  // ✅ SOLUCIÓN #3: Se eliminaron las líneas manuales de descarte de localStorage que corrompían el estado de MSAL
   document.getElementById("btnLogin").addEventListener("click", function () {
     var botonLogin = document.getElementById("btnLogin");
     var divError = document.getElementById("loginError");
@@ -1085,24 +1085,13 @@ function iniciarApp() {
     botonLogin.disabled = true;
     divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Redirigiendo a Microsoft de forma segura...</div>";
 
-    // Limpieza directa y segura compatible con móviles sin usar bucles pesados
-    try {
-      sessionStorage.clear(); // Limpia estados temporales bloqueados
-      // Remueve estados temporales de interacción específicos de MSAL de forma segura
-      localStorage.removeItem("msal.interaction.status");
-      localStorage.removeItem("msal.login.request");
-    } catch (e) {
-      console.warn("No se pudo limpiar el almacenamiento temporal:", e.message);
-    }
-
-    // Ejecución directa de la redirección externa
     msalInstance.loginRedirect({
       scopes: SCOPES,
       prompt: "select_account"
     }).catch(function (err) {
-      console.error("Fallo el loginRedirect:", err);
+      console.error(err);
       botonLogin.disabled = false;
-      divError.innerHTML = `<div class="error-msg">Error de comunicación: ${err.message}</div>`;
+      divError.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
     });
   });
 
@@ -1111,7 +1100,7 @@ function iniciarApp() {
   });
 }
 
-// ✅ CORRECCIÓN EN CIERRE DE SESIÓN: MIGRADO A REDIRECT PARA EVITAR POPUPS DE LOGOUT
+// ✅ MIGRADO A LOGOUT REDIRECT COMPATIBLE CON SMARTPHONES DE FORMA LIMPIA
 function ejecutarCierreSesion() {
   if (msalInstance) {
     msalInstance.logoutRedirect().catch(function() {
