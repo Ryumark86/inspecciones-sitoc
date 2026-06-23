@@ -1077,6 +1077,7 @@ function iniciarApp() {
     console.error("Fallo inicializando MSAL:", err);
   });
 
+ // 🚀 EVENTO LOGIN CORREGIDO CON LIMPIEZA SEGURA DE CACHÉ (EVITA CONGELAMIENTO)
   document.getElementById("btnLogin").addEventListener("click", function () {
     var botonLogin = document.getElementById("btnLogin");
     var divError = document.getElementById("loginError");
@@ -1084,16 +1085,24 @@ function iniciarApp() {
     botonLogin.disabled = true;
     divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Redirigiendo a Microsoft de forma segura...</div>";
 
-    Object.keys(localStorage).forEach(k => { if (k.includes("interaction.status")) localStorage.removeItem(k); });
-    Object.keys(sessionStorage).forEach(k => { if (k.includes("interaction.status")) sessionStorage.removeItem(k); });
+    // Limpieza directa y segura compatible con móviles sin usar bucles pesados
+    try {
+      sessionStorage.clear(); // Limpia estados temporales bloqueados
+      // Remueve estados temporales de interacción específicos de MSAL de forma segura
+      localStorage.removeItem("msal.interaction.status");
+      localStorage.removeItem("msal.login.request");
+    } catch (e) {
+      console.warn("No se pudo limpiar el almacenamiento temporal:", e.message);
+    }
 
+    // Ejecución directa de la redirección externa
     msalInstance.loginRedirect({
       scopes: SCOPES,
       prompt: "select_account"
     }).catch(function (err) {
-      console.error(err);
+      console.error("Fallo el loginRedirect:", err);
       botonLogin.disabled = false;
-      divError.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      divError.innerHTML = `<div class="error-msg">Error de comunicación: ${err.message}</div>`;
     });
   });
 
