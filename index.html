@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.7.4</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.7.5</title>
 <script>
 (function() {
   var urls = [
@@ -458,7 +458,7 @@ function resolverSitioYDrive() {
   });
 }
 
-// ✅ SECCIÓN DE COMUNICACIÓN ASÍNCRONA ROBUSTA (PRO)
+// ✅ ADQUISICIÓN DE TOKENS AJUSTADA PARA SPA REDIRECT NATIVO
 async function obtenerToken() {
   if (!cuentaActual) {
     throw new Error("No autenticado");
@@ -470,9 +470,10 @@ async function obtenerToken() {
     });
     return resp.accessToken;
   } catch (err) {
-    console.warn("Token inválido o expirado silenciosamente:", err.message);
-    limpiarCacheMSAL();
-    throw new Error("Sesión expirada");
+    console.warn("Silent falló de forma transparente, intentando interactivo...");
+    // En flujo SPA redirect redirige limpiamente de ser necesario
+    msalInstance.loginRedirect({ scopes: SCOPES });
+    throw new Error("Renovando token por redirección");
   }
 }
 window.obtenerToken = obtenerToken;
@@ -532,7 +533,6 @@ function validarFiltroYPermisosUsuario() {
   }
 }
 
-// ✅ INICIALIZACIÓN DE ESCUCHAS Y FLUJOS DEL FORMULARIO MULTIBLOQUE
 function inicializarEventosFormulario() {
   document.getElementById("selCliente").addEventListener("change", function() {
     if (bloqueadorEventosDropdowns) return;
@@ -794,21 +794,6 @@ function renderizarBloqueFotosDinamicos() {
   });
 }
 
-function eliminarFotoEspecifica(itemIdx, fotoIdx) {
-  var item = estructuraFotos[itemIdx];
-  if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
-  item.fotosList.splice(fotoIdx, 1);
-  if (item.fotosList.length === 0) item.estado = "PENDIENTE";
-  renderizarBloqueFotosDinamicos();
-  guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
-}
-
-function abrirVisorGrande(url) {
-  var modal = document.getElementById("modalVisorGrande");
-  document.getElementById("imgVisorGrandeTarget").src = url; modal.classList.remove("oculto");
-}
-document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
-
 function procesarArchivosCargados(files) {
   if (files.length > 0 && indiceItemSeleccionado !== null) {
     var itemActual = estructuraFotos[indiceItemSeleccionado]; itemActual.estado = "TOMADA";
@@ -855,36 +840,14 @@ function obtenerRutaCarpetaInspeccion() {
   return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + limpiarNombre(est) + "_" + f + "_" + ahoraHora + "_" + limpiarNombre(t);
 }
 
-function construirReporteExcelFotos(nombreEstacion, listaItemsFormulario, urlBaseFotos) {
-  var htmlExcel = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-    <head><meta charset="utf-8"><style>table { border-collapse: collapse; } td, th { border: 1px solid #d3dbe2; padding: 10px; text-align: center; font-family: Arial, sans-serif; font-size: 13px; } th { background-color: #0b3d5c; color: white; font-weight: bold; font-size: 14px; } .titulo { font-size: 17px; font-weight: bold; color: #0b3d5c; text-align: left; padding: 15px 0; } .row-seccion { background-color: #082d44; color: white; font-weight: bold; text-align: left; font-size: 13px; padding: 12px; } .row-subseccion { background-color: #f5f8fa; color: #e8731c; font-weight: bold; text-align: left; font-size: 12px; } .item-label { font-weight: bold; text-align: left; background-color: #fcfcfc; color: #1c2b36; width: 340px; } .meta-label { color: #5a6b76; width: 160px; } .celda-imagen { width: 160px; height: 120px; object-fit: cover; }</style></head>
-    <body><table><tr><td colspan="3" class="titulo">BITÁCORA FOTOGRÁFICA DE INGENIERÍA MULTIBLOQUE - ESTACIÓN: ${nombreEstacion.toUpperCase()}</td></tr><tr><th>REGISTRO / ÍTEM REQUERIDO</th><th>ESTADO DE ENTREGA</th><th>REGISTRO FOTOGRÁFICO DE CAMPO</th></tr>`;
-  
-  var ultimoBloqueImpreso = ""; var ultimoSubBloqueImpreso = "";
-
-  listaItemsFormulario.forEach(function(item) {
-    if (item.bNom !== ultimoBloqueImpreso) {
-      htmlExcel += `<tr><td colspan="3" class="row-seccion">${item.bNom.toUpperCase()}</td></tr>`;
-      ultimoBloqueImpreso = item.bNom; ultimoSubBloqueImpreso = "";
-    }
-    if (item.subNom && item.subNom !== ultimoSubBloqueImpreso) {
-      htmlExcel += `<tr><td colspan="3" class="row-subseccion">↳ Subsección: ${item.subNom}</td></tr>`;
-      ultimoSubBloqueImpreso = item.subNom;
-    }
-
-    var nombreLimpio = item.item.toUpperCase();
-    if (item.estado === "NA") { htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#c0392b;">NO APLICA</td><td style="color:#7f8c8d; font-style:italic;">Excluido por el técnico</td></tr>`; } 
-    else if (item.fotosList.length === 0) { htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#7c8a94;">PENDIENTE</td><td style="color:#7c8a94; font-style:italic;">Sin registro de captura</td></tr>`; } 
-    else {
-      item.fotosList.forEach(function(fObj, idx) {
-        var nombreArchivoCreado = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
-        var linkRealNativoSharePoint = urlBaseFotos + nombreArchivoCreado;
-        htmlExcel += `<tr><td class="item-label">${nombreLimpio} ${(item.fotosList.length > 1 ? '('+(idx+1)+')' : '')}</td><td class="meta-label" style="color:#2e7d4f;">APROBADO / EN NUBE</td><td><img src="${linkRealNativoSharePoint}" class="celda-imagen" width="160" height="120"></td></tr>`;
-      });
-    }
-  });
-  htmlExcel += `</table></body></html>`; return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
+function registrarFilaTextoPlano(token, f) {
+  var rutaM = CONFIG.archivoMaestro;
+  return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaM + ":/content", { headers: { Authorization: "Bearer " + token } })
+    .then(function(r) { return r.ok ? r.text() : "FECHA;TECNICO;CLIENTE;PROYECTO;ACTIVIDAD;ESTACION;UBICACION;LINK_SHAREPOINT\n"; })
+    .then(function(texto) {
+      var nuevaFila = f.fecha + ";" + f.tecnico + ";" + f.cliente + ";" + f.proyecto + ";" + f.actividad + ";" + f.estacion + ";" + f.ubicacion + ";" + f.linkCarpeta + "\n";
+      return subirArchivo(token, rutaM, new Blob(["\uFEFF" + texto + nuevaFila], { type: "text/csv;charset=utf-8;" }));
+    });
 }
 
 function ejecutarRastreoSuperv() {
@@ -1010,8 +973,7 @@ function mostrarAppPrincipal(esPersonalExterno) {
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
-      ubicacionCaptured = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
-      ubicacionCapturada = ubicacionCaptured;
+      ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
       document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
       document.getElementById("gpsStatusBar").classList.add("gps-success");
     }, null, { enableHighAccuracy: true });
@@ -1062,7 +1024,7 @@ function subirArchivo(token, ruta, contenido) {
 
 function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 
-// ✅ FLUJO PRINCIPAL DE ARRANQUE Y LOGIN (PASIVO/DEFENSIVO)
+// ✅ CONTROL TOTAL DEL LOGIN CON REDIRECCIÓN COMPATIBLE CON MÓVILES (ELIMINA POPUPS)
 function iniciarApp() {
   msalInstance = new msal.PublicClientApplication({
     auth: {
@@ -1077,47 +1039,51 @@ function iniciarApp() {
   });
 
   msalInstance.initialize().then(function () {
-    var cuentas = msalInstance.getAllAccounts();
-    inicializarEventosFormulario(); // Inicializa los escuchas de clics y selectores de forma segura
+    inicializarEventosFormulario();
 
-    if (cuentas.length > 0) {
-      cuentaActual = cuentas[0];
-      inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
-    } else {
+    // Captura la respuesta asíncrona cuando Microsoft devuelve al usuario a la página
+    msalInstance.handleRedirectPromise().then(function (resp) {
+      if (resp !== null) {
+        cuentaActual = resp.account;
+        inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
+      } else {
+        var cuentas = msalInstance.getAllAccounts();
+        if (cuentas.length > 0) {
+          cuentaActual = cuentas[0];
+          inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
+        } else {
+          document.getElementById("pantallaLogin").classList.remove("oculto");
+        }
+      }
+    }).catch(function (err) {
+      console.error("Error procesando redirección de MSAL:", err);
+      document.getElementById("loginError").innerHTML = `<div class="error-msg">Error de Redirección: ${err.message}</div>`;
       document.getElementById("pantallaLogin").classList.remove("oculto");
-    }
+    });
+
   }).catch(function(err){
     console.error("Fallo inicializando MSAL:", err);
   });
 
-  // Evento Clic del Botón de Login (Blindado contra interrupciones de caché)
-  document.getElementById("btnLogin").addEventListener("click", async function () {
+  // Evento Clic del Botón de Login migrado a Redirección Nativa (100% compatible con Smartphones)
+  document.getElementById("btnLogin").addEventListener("click", function () {
     var botonLogin = document.getElementById("btnLogin");
     var divError = document.getElementById("loginError");
     
     botonLogin.disabled = true;
-    divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
+    divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Redirigiendo a Microsoft de forma segura...</div>";
 
-    // Limpieza previa contra el bug de 'interaction_in_progress'
     Object.keys(localStorage).forEach(k => { if (k.includes("interaction.status")) localStorage.removeItem(k); });
     Object.keys(sessionStorage).forEach(k => { if (k.includes("interaction.status")) sessionStorage.removeItem(k); });
 
-    try {
-      const resp = await msalInstance.loginPopup({
-        scopes: SCOPES,
-        prompt: "select_account"
-      });
-      cuentaActual = resp.account;
-      divError.innerHTML = "";
-      botonLogin.disabled = false;
-      
-      await inicializarBaseDatosMultitarea();
-      validarFiltroYPermisosUsuario();
-    } catch (err) {
+    msalInstance.loginRedirect({
+      scopes: SCOPES,
+      prompt: "select_account"
+    }).catch(function (err) {
       console.error(err);
       botonLogin.disabled = false;
-      divError.innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || "Interrupción."}</div>`;
-    }
+      divError.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+    });
   });
 
   document.getElementById("btnLogout").addEventListener("click", function () {
