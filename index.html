@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.7.3</title>
+<title>Inspecciones SITOC - Formulario Multibloque V6.7.4</title>
 <script>
 (function() {
   var urls = [
@@ -237,15 +237,13 @@ var CONFIG = {
   archivoMaestro: "maestro_inspecciones.csv",
   archivoTecnicosAutorizados: "tecnicos_autorizados.csv",
   carpetaRaizInspecciones: "Inspecciones",
-  scopes: ["User.Read", "Sites.ReadWrite.All"],
+  scopes: ["User.Read", "Sites.ReadWrite.All"]
 };
 
 var SCOPES = CONFIG.scopes;
-
 var indiceItemSeleccionado = null;
 var procesandoMarcasDeAgua = 0;
 var appIniciada = false;
-
 
 var MAESTRO_BLOQUES_PLANTILLA = [
   { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto linea de vista de la antena" },
@@ -460,96 +458,103 @@ function resolverSitioYDrive() {
   });
 }
 
-  // ✅ ADQUISICIÓN ROBUSTA DE TOKENS (SI EL SILENCIOSO FALLA LANZA POPUP MANUAL ASÍNCRONO)
- async function obtenerToken() {
-
+// ✅ SECCIÓN DE COMUNICACIÓN ASÍNCRONA ROBUSTA (PRO)
+async function obtenerToken() {
   if (!cuentaActual) {
     throw new Error("No autenticado");
   }
-
   try {
-
     const resp = await msalInstance.acquireTokenSilent({
       scopes: SCOPES,
       account: cuentaActual
     });
-
     return resp.accessToken;
-
   } catch (err) {
-
-    console.warn("Token inválido:", err.message);
-
-    // ✅ limpiar sesión (PRO)
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith("msal.")) localStorage.removeItem(k);
-    });
-
-    Object.keys(sessionStorage).forEach(k => {
-      if (k.startsWith("msal.")) sessionStorage.removeItem(k);
-    });
-
-    location.reload();
-
+    console.warn("Token inválido o expirado silenciosamente:", err.message);
+    limpiarCacheMSAL();
     throw new Error("Sesión expirada");
   }
 }
-  window.obtenerToken = obtenerToken;
+window.obtenerToken = obtenerToken;
 
-  function validarFiltroYPermisosUsuario() {
-    var correoUsuario = (cuentaActual.username || "").toLowerCase();
-    var esCoordinadorSITOC = false;
+function validarFiltroYPermisosUsuario() {
+  var correoUsuario = (cuentaActual.username || "").toLowerCase();
+  var esCoordinadorSITOC = false;
 
-    if (cuentaActual.tenantId === CONFIG.tenantId || correoUsuario.endsWith("@sitoc.com") || correoUsuario.endsWith("@sitoc.com.co")) {
-      esCoordinadorSITOC = true;
-    }
-
-    if (esCoordinadorSITOC) {
-      document.getElementById("navSupervisor").classList.remove("oculto");
-      mostrarAppPrincipal(false);
-    } else {
-      document.getElementById("navSupervisor").classList.add("oculto");
-
-      resolverSitioYDrive()
-        .then(function() {
-          return obtenerToken();
-        })
-        .then(function(token) {
-          if (!token) return; 
-          return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoTecnicosAutorizados + ":/content", { headers: { Authorization: "Bearer " + token } });
-        })
-        .then(function(r) {
-          if (!r) return;
-          if (!r.ok) throw new Error("No se encontró control técnicos_autorizados.csv");
-          return r.text();
-        })
-        .then(function(csvTexto) {
-          if (!csvTexto) return;
-          var lineas = csvTexto.replace(/\r/g, "").split("\n");
-          var autorizado = false;
-          
-          for (var i = 0; i < lineas.length; i++) {
-            var lineaLimpia = lineas[i].trim().toLowerCase();
-            if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
-              autorizado = true;
-              break;
-            }
-          }
-
-          if (autorizado) {
-            mostrarAppPrincipal(true);
-          } else {
-            alert("Acceso Denegado.\nTu cuenta no está en la lista blanca.");
-            ejecutarCierreSesion();
-          }
-        })
-        .catch(function(err) {
-          console.error(err);
-          alert("Error de validación de credenciales corporativas: " + err.message);
-          ejecutarCierreSesion();
-        });
-    }
+  if (cuentaActual.tenantId === CONFIG.tenantId || correoUsuario.endsWith("@sitoc.com") || correoUsuario.endsWith("@sitoc.com.co")) {
+    esCoordinadorSITOC = true;
   }
+
+  if (esCoordinadorSITOC) {
+    document.getElementById("navSupervisor").classList.remove("oculto");
+    mostrarAppPrincipal(false);
+  } else {
+    document.getElementById("navSupervisor").classList.add("oculto");
+
+    resolverSitioYDrive()
+      .then(function() {
+        return obtenerToken();
+      })
+      .then(function(token) {
+        if (!token) return; 
+        return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoTecnicosAutorizados + ":/content", { headers: { Authorization: "Bearer " + token } });
+      })
+      .then(function(r) {
+        if (!r) return;
+        if (!r.ok) throw new Error("No se encontró control técnicos_autorizados.csv");
+        return r.text();
+      })
+      .then(function(csvTexto) {
+        if (!csvTexto) return;
+        var lineas = csvTexto.replace(/\r/g, "").split("\n");
+        var autorizado = false;
+        
+        for (var i = 0; i < lineas.length; i++) {
+          var lineaLimpia = lineas[i].trim().toLowerCase();
+          if (lineaLimpia === correoUsuario && lineaLimpia !== "") {
+            autorizado = true;
+            break;
+          }
+        }
+
+        if (autorizado) {
+          mostrarAppPrincipal(true);
+        } else {
+          alert("Acceso Denegado.\nTu cuenta no está en la lista blanca.");
+          ejecutarCierreSesion();
+        }
+      })
+      .catch(function(err) {
+        console.error(err);
+        alert("Error de validación de credenciales corporativas: " + err.message);
+        ejecutarCierreSesion();
+      });
+  }
+}
+
+// ✅ INICIALIZACIÓN DE ESCUCHAS Y FLUJOS DEL FORMULARIO MULTIBLOQUE
+function inicializarEventosFormulario() {
+  document.getElementById("selCliente").addEventListener("change", function() {
+    if (bloqueadorEventosDropdowns) return;
+    var c = document.getElementById("selCliente").value; document.getElementById("selProyecto").innerHTML = '<option value="">Selecciona un proyecto</option>';
+    document.getElementById("selActividad").disabled = true; if (!c) { document.getElementById("selProyecto").disabled = true; return; }
+    var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
+    document.getElementById("selProyecto").innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
+    document.getElementById("selProyecto").disabled = false;
+    gestionarChangeDeEstacionProactivo();
+  });
+
+  document.getElementById("selProyecto").addEventListener("change", function() {
+    if (bloqueadorEventosDropdowns) return;
+    var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value; document.getElementById("selActividad").innerHTML = '<option value="">Selecciona una actividad</option>';
+    if (!p) { document.getElementById("selActividad").disabled = true; return; }
+    var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
+    document.getElementById("selActividad").innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
+    document.getElementById("selActividad").disabled = false;
+    gestionarChangeDeEstacionProactivo();
+  });
+
+  document.getElementById("selActividad").addEventListener("change", gestionarChangeDeEstacionProactivo);
 
   document.getElementById("navCampo").addEventListener("click", function() {
     document.getElementById("navCampo").classList.add("btn-nav-active");
@@ -589,243 +594,6 @@ function resolverSitioYDrive() {
     document.getElementById("vistaCampo").classList.add("oculto");
     document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
   });
-
-  function mostrarAppPrincipal(esPersonalExterno) {
-    document.getElementById("pantallaLogin").classList.add("oculto");
-    document.getElementById("appPrincipal").classList.remove("oculto");
-    document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
-    document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
-
-    if (esPersonalExterno) {
-      var btnSup = document.getElementById("navSupervisor");
-      if (btnSup) btnSup.classList.add("oculto");
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(pos) {
-        ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
-        document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
-        document.getElementById("gpsStatusBar").classList.add("gps-success");
-      }, null, { enableHighAccuracy: true });
-    }
-
-    estructuraFotos = MAESTRO_BLOQUES_PLANTILLA.map(function(b) { return { bNom: b.bNom, subNom: b.subNom, item: b.item, estado: "PENDIENTE", fotosList: [] }; });
-    renderizarBloqueFotosDinamicos();
-    actualizarBandejaBorradoresUI();
-
-    resolverSitioYDrive()
-      .then(descargarYLeerConfiguracion)
-      .then(function() {
-        var btnBuscarSup = document.getElementById("btnCargarCarpetasActivas");
-        if (btnBuscarSup) { 
-          btnBuscarSup.disabled = esPersonalExterno; 
-          btnBuscarSup.textContent = esPersonalExterno ? "🔒 Panel restringido para externos" : "🔄 Buscar Inspecciones Activas en SharePoint"; 
-        }
-      }).catch(function(e) { console.error(e); });
-  }
-
-  function descargarYLeerConfiguracion() {
-    return obtenerToken().then(function(token) {
-      if (!token) return;
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { 
-          if (!r.ok) throw new Error("Código de estado HTTP: " + r.status);
-          return r.text(); 
-        })
-        .then(function(texto) {
-          datosConfiguracion = procesarCSVNativo(texto);
-          var clientes = uniques(datosConfiguracion.map(function(f) { return f.cliente; }));
-          if (clientes.length === 0) {
-            document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Archivo vacío o mal formateado</option>';
-            return;
-          }
-          document.getElementById("selCliente").innerHTML = '<option value="">Selecciona un cliente</option>' + clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
-        })
-        .catch(function(error) {
-          console.error("Error al descargar configuración:", error);
-          document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Error de comunicación con SharePoint</option>';
-        });
-    });
-  }
-
-  function gestionarChangeDeEstacionProactivo() {
-    if (bloqueadorEventosDropdowns) return;
-    if (ultimaEstacionSeleccionada && estructuraFotos.some(function(i){return i.fotosList.length > 0 || i.estado === "NA";})) {
-      guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
-    }
-    
-    var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value, a = document.getElementById("selActividad").value, e = "ESTACION_UNICA";
-    if (c && p && a) {
-      var idLlaveSitioActual = (c + "___" + p + "___" + a + "___" + e).replace(/\s+/g, "_");
-      ultimaEstacionSeleccionada = idLlaveSitioActual;
-      
-      if (!dbInspecciones) return;
-      var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
-      transaccion.objectStore("borradores_estaciones").get(idLlaveSitioActual).onsuccess = function(ev) {
-        var borrador = ev.target.result;
-        if (borrador) {
-          estructuraFotos = borrador.estructura.map(function(item) {
-            return {
-              bNom: item.bNom,
-              subNom: item.subNom,
-              item: item.item,
-              estado: item.estado,
-              fotosList: item.fotosList.map(function(foto) { return { file: foto.fileBlob, previewUrl: URL.createObjectURL(foto.fileBlob), subido: foto.subido, filename: foto.filename }; })
-            };
-          });
-          document.getElementById("inpNotas").value = borrador.notes || "";
-        } else {
-          estructuraFotos = MAESTRO_BLOQUES_PLANTILLA.map(function(b) { return { bNom: b.bNom, subNom: b.subNom, item: b.item, estado: "PENDIENTE", fotosList: [] }; });
-          document.getElementById("inpNotas").value = "";
-        }
-        renderizarBloqueFotosDinamicos();
-      };
-    }
-  }
-
-  document.getElementById("selCliente").addEventListener("change", function() {
-    if (bloqueadorEventosDropdowns) return;
-    var c = document.getElementById("selCliente").value; document.getElementById("selProyecto").innerHTML = '<option value="">Selecciona un proyecto</option>';
-    document.getElementById("selActividad").disabled = true; if (!c) { document.getElementById("selProyecto").disabled = true; return; }
-    var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
-    document.getElementById("selProyecto").innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-    document.getElementById("selProyecto").disabled = false;
-    gestionarChangeDeEstacionProactivo();
-  });
-
-  document.getElementById("selProyecto").addEventListener("change", function() {
-    if (bloqueadorEventosDropdowns) return;
-    var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value; document.getElementById("selActividad").innerHTML = '<option value="">Selecciona una actividad</option>';
-    if (!p) { document.getElementById("selActividad").disabled = true; return; }
-    var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
-    document.getElementById("selActividad").innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-    document.getElementById("selActividad").disabled = false;
-    gestionarChangeDeEstacionProactivo();
-  });
-
-  document.getElementById("selActividad").addEventListener("change", gestionarChangeDeEstacionProactivo);
-
-  function renderizarBloqueFotosDinamicos() {
-    var contenedor = document.getElementById("contenedorDinamicoBloquesFotos"); contenedor.innerHTML = "";
-    var ultimoBloqueImpreso = ""; var ultimoSubBloqueImpreso = "";
-
-    estructuraFotos.forEach(function(foto, idx) {
-      if (foto.bNom !== ultimoBloqueImpreso) {
-        var dBlq = document.createElement("div"); dBlq.className = "seccion-bloque-titulo"; dBlq.textContent = foto.bNom;
-        contenedor.appendChild(dBlq); ultimoBloqueImpreso = foto.bNom; ultimoSubBloqueImpreso = "";
-      }
-      if (foto.subNom && foto.subNom !== ultimoSubBloqueImpreso) {
-        var dSub = document.createElement("div"); dSub.className = "seccion-subbloque-titulo"; dSub.textContent = "↳ " + foto.subNom;
-        contenedor.appendChild(dSub); ultimoSubBloqueImpreso = foto.subNom;
-      }
-
-      var row = document.createElement("div"); row.className = "foto-item-row";
-      var headerRow = document.createElement("div"); headerRow.className = "foto-item-header";
-      var info = document.createElement("div"); info.className = "foto-item-info";
-      var t = document.createElement("div"); t.className = "foto-item-title"; t.textContent = foto.item;
-      var est = document.createElement("div"); est.className = "foto-item-status";
-      
-      if (foto.estado === "PENDIENTE") { est.textContent = "❌ Pendiente local"; est.className += " status-pendiente"; }
-      else if (foto.estado === "TOMADA") { est.textContent = "📸 " + foto.fotosList.length + " por guardar"; est.className += " status-tomada"; }
-      else if (foto.estado === "SUBIDA") { est.textContent = "☁ Sincronizada en SharePoint (" + foto.fotosList.length + ")"; est.className += " status-subida"; }
-      else if (foto.estado === "NA") { est.textContent = "🚫 No Aplica"; est.className += " status-na"; }
-
-      info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
-      var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
-      
-      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Cám";
-      bF.addEventListener("click", function() { indiceItemSeleccionado = idx; document.getElementById("inputCamaraDirecta").click(); });
-      
-      var bG = document.createElement("button"); bG.type = "button"; bG.className = "btn-accion-galeria"; bG.textContent = "📁 Gal";
-      bG.addEventListener("click", function() { indiceItemSeleccionado = idx; document.getElementById("inputGaleriaDirecta").click(); });
-      
-      var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
-      bN.addEventListener("click", function() { 
-        estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotosDinamicos(); 
-        guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
-      });
-      
-      acts.appendChild(bF); acts.appendChild(bG); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
-
-      if (foto.fotosList.length > 0) {
-        var tc = document.createElement("div"); tc.className = "thumbs-container";
-        foto.fotosList.forEach(function(fObj, fIdx) {
-          var wrap = document.createElement("div"); wrap.className = "thumb-wrapper";
-          var img = document.createElement("img"); img.src = fObj.previewUrl; img.addEventListener("click", function() { abrirVisorGrande(fObj.previewUrl); });
-          wrap.appendChild(img);
-          var bD = document.createElement("button"); bD.className = "btn-borrar-foto"; bD.type = "button"; bD.textContent = "×";
-          bD.addEventListener("click", function() { eliminarFotoEspecifica(idx, fIdx); });
-          wrap.appendChild(bD); tc.appendChild(wrap);
-        });
-        row.appendChild(tc);
-      }
-      contenedor.appendChild(row);
-    });
-  }
-
-  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
-    var item = estructuraFotos[itemIdx];
-    if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
-    item.fotosList.splice(fotoIdx, 1);
-    if (item.fotosList.length === 0) item.estado = "PENDIENTE";
-    renderizarBloqueFotosDinamicos();
-    guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
-  }
-
-  function abrirVisorGrande(url) {
-    var modal = document.getElementById("modalVisorGrande");
-    document.getElementById("imgVisorGrandeTarget").src = url; modal.classList.remove("oculto");
-  }
-  document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
-
-  function procesarArchivosCargados(files) {
-    if (files.length > 0 && indiceItemSeleccionado !== null) {
-      var itemActual = estructuraFotos[indiceItemSeleccionado]; itemActual.estado = "TOMADA";
-      var est = document.getElementById("inpEstacion").value.trim() || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
-      files.forEach(function(f) {
-        procesandoMarcasDeAgua++;
-        estamparMarcaDeAgua(f, g, est, h, function(b) {
-          if (b) { estructuraFotos[indiceItemSeleccionado].fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" }); }
-          procesandoMarcasDeAgua--; renderizarBloqueFotosDinamicos();
-          guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
-        });
-      });
-    }
-  }
-
-  document.getElementById("inputCamaraDirecta").addEventListener("change", function(e) { procesarArchivosCargados(Array.from(e.target.files)); e.target.value = ""; });
-  document.getElementById("inputGaleriaDirecta").addEventListener("change", function(e) { procesarArchivosCargados(Array.from(e.target.files)); e.target.value = ""; });
-
-  function estamparMarcaDeAgua(f, c, e, h, cb) {
-    var r = new FileReader(); r.readAsDataURL(f);
-    r.onload = function(ev) {
-      var img = new Image(); img.src = ev.target.result;
-      img.onload = function() {
-        var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
-        var MAX_ANCHO_ALTO = 1920; var anchoOriginal = img.width; var altoOriginal = img.height;
-        var nuevoAncho = anchoOriginal; var nuevoAlto = altoOriginal;
-        if (anchoOriginal > MAX_ANCHO_ALTO || altoOriginal > MAX_ANCHO_ALTO) {
-          if (anchoOriginal > altoOriginal) { nuevoAncho = MAX_ANCHO_ALTO; nuevoAlto = Math.round((altoOriginal * MAX_ANCHO_ALTO) / anchoOriginal); } 
-          else { nuevoAlto = MAX_ANCHO_ALTO; nuevoAncho = Math.round((anchoOriginal * MAX_ANCHO_ALTO) / altoOriginal); }
-        }
-        canvas.width = nuevoAncho; canvas.height = nuevoAlto; ctx.drawImage(img, 0, 0, nuevoAncho, nuevoAlto);
-        var ac = Math.max(65, Math.round(canvas.height * 0.08)), tf = Math.max(14, Math.round(ac * 0.25));
-        ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - ac, canvas.width, ac);
-        ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
-        ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
-        ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
-        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.85);
-      };
-    };
-  }
-
-  function obtenerRutaCarpetaInspeccion() {
-    var c = document.getElementById("selCliente").value || "CLIENTE_SITIO", p = document.getElementById("selProyecto").value || "PROYECTO_SITIO";
-    var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
-    var est = document.getElementById("inpEstacion").value.trim() || "SITIO";
-    var ahoraHora = new Date().toTimeString().split(" ")[0].replace(/:/g, "-");
-    return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + limpiarNombre(est) + "_" + f + "_" + ahoraHora + "_" + limpiarNombre(t);
-  }
 
   document.getElementById("btnGuardarFotosGlobal").addEventListener("click", function() {
     if (!document.getElementById("selCliente").value || !document.getElementById("inpEstacion").value.trim() || !document.getElementById("inpTecnico").value.trim()) { alert("Faltan datos de ubicación, estación o técnico."); return; }
@@ -927,170 +695,375 @@ function resolverSitioYDrive() {
     }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
   });
 
-  function registrarFilaTextoPlano(token, f) {
-    var rutaM = CONFIG.archivoMaestro;
-    return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaM + ":/content", { headers: { Authorization: "Bearer " + token } })
-      .then(function(r) { return r.ok ? r.text() : "FECHA;TECNICO;CLIENTE;PROYECTO;ACTIVIDAD;ESTACION;UBICACION;LINK_SHAREPOINT\n"; })
-      .then(function(texto) {
-        var nuevaFila = f.fecha + ";" + f.tecnico + ";" + f.cliente + ";" + f.proyecto + ";" + f.actividad + ";" + f.estacion + ";" + f.ubicacion + ";" + f.linkCarpeta + "\n";
-        return subirArchivo(token, rutaM, new Blob(["\uFEFF" + texto + nuevaFila], { type: "text/csv;charset=utf-8;" }));
-      });
-  }
-
-  function construirReporteExcelFotos(nombreEstacion, listaItemsFormulario, urlBaseFotos) {
-    var htmlExcel = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="utf-8"><style>table { border-collapse: collapse; } td, th { border: 1px solid #d3dbe2; padding: 10px; text-align: center; font-family: Arial, sans-serif; font-size: 13px; } th { background-color: #0b3d5c; color: white; font-weight: bold; font-size: 14px; } .titulo { font-size: 17px; font-weight: bold; color: #0b3d5c; text-align: left; padding: 15px 0; } .row-seccion { background-color: #082d44; color: white; font-weight: bold; text-align: left; font-size: 13px; padding: 12px; } .row-subseccion { background-color: #f5f8fa; color: #e8731c; font-weight: bold; text-align: left; font-size: 12px; } .item-label { font-weight: bold; text-align: left; background-color: #fcfcfc; color: #1c2b36; width: 340px; } .meta-label { color: #5a6b76; width: 160px; } .celda-imagen { width: 160px; height: 120px; object-fit: cover; }</style></head>
-      <body><table><tr><td colspan="3" class="titulo">BITÁCORA FOTOGRÁFICA DE INGENIERÍA MULTIBLOQUE - ESTACIÓN: ${nombreEstacion.toUpperCase()}</td></tr><tr><th>REGISTRO / ÍTEM REQUERIDO</th><th>ESTADO DE ENTREGA</th><th>REGISTRO FOTOGRÁFICO DE CAMPO</th></tr>`;
-    
-    var ultimoBloqueImpreso = ""; var ultimoSubBloqueImpreso = "";
-
-    listaItemsFormulario.forEach(function(item) {
-      if (item.bNom !== ultimoBloqueImpreso) {
-        htmlExcel += `<tr><td colspan="3" class="row-seccion">${item.bNom.toUpperCase()}</td></tr>`;
-        ultimoBloqueImpreso = item.bNom; ultimoSubBloqueImpreso = "";
-      }
-      if (item.subNom && item.subNom !== ultimoSubBloqueImpreso) {
-        htmlExcel += `<tr><td colspan="3" class="row-subseccion">↳ Subsección: ${item.subNom}</td></tr>`;
-        ultimoSubBloqueImpreso = item.subNom;
-      }
-
-      var nombreLimpio = item.item.toUpperCase();
-      if (item.estado === "NA") { htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#c0392b;">NO APLICA</td><td style="color:#7f8c8d; font-style:italic;">Excluido por el técnico</td></tr>`; } 
-      else if (item.fotosList.length === 0) { htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#7c8a94;">PENDIENTE</td><td style="color:#7c8a94; font-style:italic;">Sin registro de captura</td></tr>`; } 
-      else {
-        item.fotosList.forEach(function(fObj, idx) {
-          var nombreArchivoCreado = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
-          var linkRealNativoSharePoint = urlBaseFotos + nombreArchivoCreado;
-          htmlExcel += `<tr><td class="item-label">${nombreLimpio} ${(item.fotosList.length > 1 ? '('+(idx+1)+')' : '')}</td><td class="meta-label" style="color:#2e7d4f;">APROBADO / EN NUBE</td><td><img src="${linkRealNativoSharePoint}" class="celda-imagen" width="160" height="120"></td></tr>`;
-        });
-      }
-    });
-    htmlExcel += `</table></body></html>`; return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
-  }
-
-  document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
-    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
-    var listaSelect = document.getElementById("selCarpetaMonitoreo"); listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
-
-    obtenerToken().then(function(token) {
-      if (!token) return;
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.ok ? r.json() : { value: [] }; }).then(function(resClientes) {
-          var promesasProyectos = [];
-          resClientes.value.forEach(function(itemCliente) {
-            if (itemCliente.folder) {
-              var rutaCliente = CONFIG.carpetaRaizInspecciones + "/" + itemCliente.name;
-              var p = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaCliente + ":/children", { headers: { Authorization: "Bearer " + token } })
-                .then(function(r) { return r.ok ? r.json() : { value: [] }; }).then(function(resProyectos) {
-                  var promesasSitios = [];
-                  resProyectos.value.forEach(function(itemProyecto) {
-                    if (itemProyecto.folder) {
-                      var rutaProyecto = rutaCliente + "/" + itemProyecto.name;
-                      var s = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaProyecto + ":/children", { headers: { Authorization: "Bearer " + token } })
-                        .then(function(r) { return r.ok ? r.json() : { value: [] }; }).then(function(resSitios) {
-                          resSitios.value.forEach(function(itemSitio) {
-                            if (itemSitio.folder && itemSitio.name.includes("_")) {
-                              var opt = document.createElement("option"); opt.value = rutaProyecto + "/" + itemSitio.name + "/fotos"; opt.textContent = "📍 Sitio: " + itemSitio.name; listaSelect.appendChild(opt);
-                            }
-                          });
-                        });
-                      promesasSitios.push(s);
-                    }
-                  }); return Promise.all(promesasSitios);
-                }); promesasProyectos.push(p);
-            }
-          }); return Promise.all(promesasProyectos);
-        }).then(function() { ov.classList.add("oculto"); alert("Rastreo en tiempo real terminado."); });
-    }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
-  });
-
+  document.getElementById("inputCamaraDirecta").addEventListener("change", function(e) { procesarArchivosCargados(Array.from(e.target.files)); e.target.value = ""; });
+  document.getElementById("inputGaleriaDirecta").addEventListener("change", function(e) { procesarArchivosCargados(Array.from(e.target.files)); e.target.value = ""; });
+  document.getElementById("btnCargarCarpetasActivas").addEventListener("click", ejecutarRastreoSuperv);
   document.getElementById("selCarpetaMonitoreo").addEventListener("change", cargarGaleriaSupervisor);
+}
 
-  function cargarGaleriaSupervisor() {
-    var rutaFotos = document.getElementById("selCarpetaMonitoreo").value; 
-    if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
+function gestionarChangeDeEstacionProactivo() {
+  if (bloqueadorEventosDropdowns) return;
+  if (ultimaEstacionSeleccionada && estructuraFotos.some(function(i){return i.fotosList.length > 0 || i.estado === "NA";})) {
+    guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+  }
+  
+  var c = document.getElementById("selCliente").value, p = document.getElementById("selProyecto").value, a = document.getElementById("selActividad").value, e = "ESTACION_UNICA";
+  if (c && p && a) {
+    var idLlaveSitioActual = (c + "___" + p + "___" + a + "___" + e).replace(/\s+/g, "_");
+    ultimaEstacionSeleccionada = idLlaveSitioActual;
     
-    var galeria = document.getElementById("galeriaFotosSupervisor"); 
-    galeria.innerHTML = "Cargando y clasificando fotos por bloques de ingeniería..."; 
-    document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
-
-    obtenerToken().then(function(token) {
-      if (!token) return;
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaFotos + ":/children", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.json(); }).then(function(json) {
-          galeria.innerHTML = ""; 
-          if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía en este sitio."; return; }
-          
-          var gruposClasificados = {
-            "BLOQUE 1: INSTALACIÓN DE ANTENAS": [],
-            "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR": [],
-            "BLOQUE 3: PDB": [],
-            "BLOQUE 4: SISTEMA PUESTA DE TIERRA": [],
-            "BLOQUE 5: IDU y MARQUILLADO": [],
-            "OTROS ARCHIVOS NO CLASIFICADOS": []
+    if (!dbInspecciones) return;
+    var transaccion = dbInspecciones.transaction(["borradores_estaciones"], "readonly");
+    transaccion.objectStore("borradores_estaciones").get(idLlaveSitioActual).onsuccess = function(ev) {
+      var borrador = ev.target.result;
+      if (borrador) {
+        estructuraFotos = borrador.estructura.map(function(item) {
+          return {
+            bNom: item.bNom,
+            subNom: item.subNom,
+            item: item.item,
+            estado: item.estado,
+            fotosList: item.fotosList.map(function(foto) { return { file: foto.fileBlob, previewUrl: URL.createObjectURL(foto.fileBlob), subido: foto.subido, filename: foto.filename }; })
           };
-
-          json.value.forEach(function(archivo) {
-            var nMin = archivo.name.toLowerCase();
-            var asignado = false;
-
-            if (nMin.includes("antena") || nMin.includes("herraje") || nMin.includes("vista") || nMin.includes("encintado")) {
-              gruposClasificados["BLOQUE 1: INSTALACIÓN DE ANTENAS"].push(archivo); asignado = true;
-            } else if (nMin.includes("cable_if") || nMin.includes("recorrido") || nMin.includes("escalerilla") || nMin.includes("pasamuros") || nMin.includes("rack") || nMin.includes("gabinete") || nMin.includes("curvatora") || nMin.includes("marquillas_de_los_cable")) {
-              gruposClasificados["BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR"].push(archivo); asignado = true;
-            } else if (nMin.includes("pdb") || nMin.includes("breaker") || nMin.includes("48v") || nMin.includes("0v") || nMin.includes("drenaje")) {
-              gruposClasificados["BLOQUE 3: PDB"].push(archivo); asignado = true;
-            } else if (nMin.includes("tierra") || nMin.includes("barraje") || nMin.includes("guaya")) {
-              gruposClasificados["BLOQUE 4: SISTEMA PUESTA DE TIERRA"].push(archivo); asignado = true;
-            } else if (nMin.includes("idu") || nMin.includes("frontal") || nMin.includes("posterior") || nMin.includes("trasero") || nMin.includes("derecho") || nMin.includes("izquierdo") || nMin.includes("marquilla_de_la_idu")) {
-              gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
-            }
-
-            if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
-          });
-
-          Object.keys(gruposClasificados).forEach(function(nombreBloque) {
-            var listaFotosBloque = gruposClasificados[nombreBloque];
-            if (listaFotosBloque.length > 0) {
-              var tituloBloqueDiv = document.createElement("div");
-              tituloBloqueDiv.className = "supervisor-bloque-header";
-              tituloBloqueDiv.textContent = nombreBloque + " (" + listaFotosBloque.length + " fotos)";
-              galeria.appendChild(tituloBloqueDiv);
-
-              var gridDiv = document.createElement("div");
-              gridDiv.className = "grid-supervisor-fotos";
-
-              listaFotosBloque.forEach(function(archivo) {
-                var card = document.createElement("div"); card.className = "card-foto-superv";
-                var img = document.createElement("img"); img.src = archivo["@microsoft.graph.downloadUrl"]; img.addEventListener("click", function() { window.open(archivo.webUrl, "_blank"); });
-                var meta = document.createElement("div"); meta.className = "meta"; meta.textContent = archivo.name.replace(/_/g, " ").replace(".jpg", "");
-                var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑  Rechazar / Eliminar";
-                btnR.addEventListener("click", function() {
-                  if (confirm("¿Deseas eliminar esta foto de SharePoint?")) {
-                    fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) { if (r.ok) { alert("Foto eliminada."); cargarGaleriaSupervisor(); } });
-                  }
-                });
-                card.appendChild(img); card.appendChild(meta); card.appendChild(btnR); gridDiv.appendChild(card);
-              });
-              galeria.appendChild(gridDiv);
-            }
-          });
         });
+        document.getElementById("inpNotas").value = borrador.notes || "";
+      } else {
+        estructuraFotos = MAESTRO_BLOQUES_PLANTILLA.map(function(b) { return { bNom: b.bNom, subNom: b.subNom, item: b.item, estado: "PENDIENTE", fotosList: [] }; });
+        document.getElementById("inpNotas").value = "";
+      }
+      renderizarBloqueFotosDinamicos();
+    };
+  }
+}
+
+function renderizarBloqueFotosDinamicos() {
+  var contenedor = document.getElementById("contenedorDinamicoBloquesFotos"); contenedor.innerHTML = "";
+  var ultimoBloqueImpreso = ""; var ultimoSubBloqueImpreso = "";
+
+  estructuraFotos.forEach(function(foto, idx) {
+    if (foto.bNom !== ultimoBloqueImpreso) {
+      var dBlq = document.createElement("div"); dBlq.className = "seccion-bloque-titulo"; dBlq.textContent = foto.bNom;
+      contenedor.appendChild(dBlq); ultimoBloqueImpreso = foto.bNom; ultimoSubBloqueImpreso = "";
+    }
+    if (foto.subNom && foto.subNom !== ultimoSubBloqueImpreso) {
+      var dSub = document.createElement("div"); dSub.className = "seccion-subbloque-titulo"; dSub.textContent = "↳ " + foto.subNom;
+      contenedor.appendChild(dSub); ultimoSubBloqueImpreso = foto.subNom;
+    }
+
+    var row = document.createElement("div"); row.className = "foto-item-row";
+    var headerRow = document.createElement("div"); headerRow.className = "foto-item-header";
+    var info = document.createElement("div"); info.className = "foto-item-info";
+    var t = document.createElement("div"); t.className = "foto-item-title"; t.textContent = foto.item;
+    var est = document.createElement("div"); est.className = "foto-item-status";
+    
+    if (foto.estado === "PENDIENTE") { est.textContent = "❌ Pendiente local"; est.className += " status-pendiente"; }
+    else if (foto.estado === "TOMADA") { est.textContent = "📸 " + foto.fotosList.length + " por guardar"; est.className += " status-tomada"; }
+    else if (foto.estado === "SUBIDA") { est.textContent = "☁ Sincronizada en SharePoint (" + foto.fotosList.length + ")"; est.className += " status-subida"; }
+    else if (foto.estado === "NA") { est.textContent = "🚫 No Aplica"; est.className += " status-na"; }
+
+    info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
+    var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
+    
+    var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Cám";
+    bF.addEventListener("click", function() { indiceItemSeleccionado = idx; document.getElementById("inputCamaraDirecta").click(); });
+    
+    var bG = document.createElement("button"); bG.type = "button"; bG.className = "btn-accion-galeria"; bG.textContent = "📁 Gal";
+    bG.addEventListener("click", function() { indiceItemSeleccionado = idx; document.getElementById("inputGaleriaDirecta").click(); });
+    
+    var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
+    bN.addEventListener("click", function() { 
+      estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotosDinamicos(); 
+      guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+    });
+    
+    acts.appendChild(bF); acts.appendChild(bG); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
+
+    if (foto.fotosList.length > 0) {
+      var tc = document.createElement("div"); tc.className = "thumbs-container";
+      foto.fotosList.forEach(function(fObj, fIdx) {
+        var wrap = document.createElement("div"); wrap.className = "thumb-wrapper";
+        var img = document.createElement("img"); img.src = fObj.previewUrl; img.addEventListener("click", function() { abrirVisorGrande(fObj.previewUrl); });
+        wrap.appendChild(img);
+        var bD = document.createElement("button"); bD.className = "btn-borrar-foto"; bD.type = "button"; bD.textContent = "×";
+        bD.addEventListener("click", function() { eliminarFotoEspecifica(idx, fIdx); });
+        wrap.appendChild(bD); tc.appendChild(wrap);
+      });
+      row.appendChild(tc);
+    }
+    contenedor.appendChild(row);
+  });
+}
+
+function eliminarFotoEspecifica(itemIdx, fotoIdx) {
+  var item = estructuraFotos[itemIdx];
+  if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
+  item.fotosList.splice(fotoIdx, 1);
+  if (item.fotosList.length === 0) item.estado = "PENDIENTE";
+  renderizarBloqueFotosDinamicos();
+  guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+}
+
+function abrirVisorGrande(url) {
+  var modal = document.getElementById("modalVisorGrande");
+  document.getElementById("imgVisorGrandeTarget").src = url; modal.classList.remove("oculto");
+}
+document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
+
+function procesarArchivosCargados(files) {
+  if (files.length > 0 && indiceItemSeleccionado !== null) {
+    var itemActual = estructuraFotos[indiceItemSeleccionado]; itemActual.estado = "TOMADA";
+    var est = document.getElementById("inpEstacion").value.trim() || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
+    files.forEach(function(f) {
+      procesandoMarcasDeAgua++;
+      estamparMarcaDeAgua(f, g, est, h, function(b) {
+        if (b) { estructuraFotos[indiceItemSeleccionado].fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" }); }
+        procesandoMarcasDeAgua--; renderizarBloqueFotosDinamicos();
+        guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+      });
     });
   }
+}
 
-  function subirArchivo(token, ruta, contenido) {
-    return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + ruta + ":/content", { method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" }, body: contenido }).then(function(r) { return r.json(); });
+function estamparMarcaDeAgua(f, c, e, h, cb) {
+  var r = new FileReader(); r.readAsDataURL(f);
+  r.onload = function(ev) {
+    var img = new Image(); img.src = ev.target.result;
+    img.onload = function() {
+      var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
+      var MAX_ANCHO_ALTO = 1920; var anchoOriginal = img.width; var altoOriginal = img.height;
+      var nuevoAncho = anchoOriginal; var nuevoAlto = altoOriginal;
+      if (anchoOriginal > MAX_ANCHO_ALTO || altoOriginal > MAX_ANCHO_ALTO) {
+        if (anchoOriginal > altoOriginal) { nuevoAncho = MAX_ANCHO_ALTO; nuevoAlto = Math.round((altoOriginal * MAX_ANCHO_ALTO) / anchoOriginal); } 
+        else { nuevoAlto = MAX_ANCHO_ALTO; nuevoAncho = Math.round((anchoOriginal * MAX_ANCHO_ALTO) / altoOriginal); }
+      }
+      canvas.width = nuevoAncho; canvas.height = nuevoAlto; ctx.drawImage(img, 0, 0, nuevoAncho, nuevoAlto);
+      var ac = Math.max(65, Math.round(canvas.height * 0.08)), tf = Math.max(14, Math.round(ac * 0.25));
+      ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - ac, canvas.width, ac);
+      ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
+      ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
+      ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
+      canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.85);
+    };
+  };
+}
+
+function obtenerRutaCarpetaInspeccion() {
+  var c = document.getElementById("selCliente").value || "CLIENTE_SITIO", p = document.getElementById("selProyecto").value || "PROYECTO_SITIO";
+  var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
+  var est = document.getElementById("inpEstacion").value.trim() || "SITIO";
+  var ahoraHora = new Date().toTimeString().split(" ")[0].replace(/:/g, "-");
+  return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + limpiarNombre(est) + "_" + f + "_" + ahoraHora + "_" + limpiarNombre(t);
+}
+
+function construirReporteExcelFotos(nombreEstacion, listaItemsFormulario, urlBaseFotos) {
+  var htmlExcel = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><style>table { border-collapse: collapse; } td, th { border: 1px solid #d3dbe2; padding: 10px; text-align: center; font-family: Arial, sans-serif; font-size: 13px; } th { background-color: #0b3d5c; color: white; font-weight: bold; font-size: 14px; } .titulo { font-size: 17px; font-weight: bold; color: #0b3d5c; text-align: left; padding: 15px 0; } .row-seccion { background-color: #082d44; color: white; font-weight: bold; text-align: left; font-size: 13px; padding: 12px; } .row-subseccion { background-color: #f5f8fa; color: #e8731c; font-weight: bold; text-align: left; font-size: 12px; } .item-label { font-weight: bold; text-align: left; background-color: #fcfcfc; color: #1c2b36; width: 340px; } .meta-label { color: #5a6b76; width: 160px; } .celda-imagen { width: 160px; height: 120px; object-fit: cover; }</style></head>
+    <body><table><tr><td colspan="3" class="titulo">BITÁCORA FOTOGRÁFICA DE INGENIERÍA MULTIBLOQUE - ESTACIÓN: ${nombreEstacion.toUpperCase()}</td></tr><tr><th>REGISTRO / ÍTEM REQUERIDO</th><th>ESTADO DE ENTREGA</th><th>REGISTRO FOTOGRÁFICO DE CAMPO</th></tr>`;
+  
+  var ultimoBloqueImpreso = ""; var ultimoSubBloqueImpreso = "";
+
+  listaItemsFormulario.forEach(function(item) {
+    if (item.bNom !== ultimoBloqueImpreso) {
+      htmlExcel += `<tr><td colspan="3" class="row-seccion">${item.bNom.toUpperCase()}</td></tr>`;
+      ultimoBloqueImpreso = item.bNom; ultimoSubBloqueImpreso = "";
+    }
+    if (item.subNom && item.subNom !== ultimoSubBloqueImpreso) {
+      htmlExcel += `<tr><td colspan="3" class="row-subseccion">↳ Subsección: ${item.subNom}</td></tr>`;
+      ultimoSubBloqueImpreso = item.subNom;
+    }
+
+    var nombreLimpio = item.item.toUpperCase();
+    if (item.estado === "NA") { htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#c0392b;">NO APLICA</td><td style="color:#7f8c8d; font-style:italic;">Excluido por el técnico</td></tr>`; } 
+    else if (item.fotosList.length === 0) { htmlExcel += `<tr><td class="item-label">${nombreLimpio}</td><td class="meta-label" style="color:#7c8a94;">PENDIENTE</td><td style="color:#7c8a94; font-style:italic;">Sin registro de captura</td></tr>`; } 
+    else {
+      item.fotosList.forEach(function(fObj, idx) {
+        var nombreArchivoCreado = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
+        var linkRealNativoSharePoint = urlBaseFotos + nombreArchivoCreado;
+        htmlExcel += `<tr><td class="item-label">${nombreLimpio} ${(item.fotosList.length > 1 ? '('+(idx+1)+')' : '')}</td><td class="meta-label" style="color:#2e7d4f;">APROBADO / EN NUBE</td><td><img src="${linkRealNativoSharePoint}" class="celda-imagen" width="160" height="120"></td></tr>`;
+      });
+    }
+  });
+  htmlExcel += `</table></body></html>`; return new Blob([htmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
+}
+
+function ejecutarRastreoSuperv() {
+  var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
+  document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
+  var listaSelect = document.getElementById("selCarpetaMonitoreo"); listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
+
+  obtenerToken().then(function(token) {
+    if (!token) return;
+    return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children", { headers: { Authorization: "Bearer " + token } })
+      .then(function(r) { return r.ok ? r.json() : { value: [] }; }).then(function(resClientes) {
+        var promesasProyectos = [];
+        resClientes.value.forEach(function(itemCliente) {
+          if (itemCliente.folder) {
+            var rutaCliente = CONFIG.carpetaRaizInspecciones + "/" + itemCliente.name;
+            var p = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaCliente + ":/children", { headers: { Authorization: "Bearer " + token } })
+              .then(function(r) { return r.ok ? r.json() : { value: [] }; }).then(function(resProyectos) {
+                var promesasSitios = [];
+                resProyectos.value.forEach(function(itemProyecto) {
+                  if (itemProyecto.folder) {
+                    var rutaProyecto = rutaCliente + "/" + itemProyecto.name;
+                    var s = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaProyecto + ":/children", { headers: { Authorization: "Bearer " + token } })
+                      .then(function(r) { return r.ok ? r.json() : { value: [] }; }).then(function(resSitios) {
+                        resSitios.value.forEach(function(itemSitio) {
+                          if (itemSitio.folder && itemSitio.name.includes("_")) {
+                            var opt = document.createElement("option"); opt.value = rutaProyecto + "/" + itemSitio.name + "/fotos"; opt.textContent = "📍 Sitio: " + itemSitio.name; listaSelect.appendChild(opt);
+                          }
+                        });
+                      });
+                    promesasSitios.push(s);
+                  }
+                }); return Promise.all(promesasSitios);
+              }); promesasProyectos.push(p);
+          }
+        }); return Promise.all(promesasProyectos);
+      }).then(function() { ov.classList.add("oculto"); alert("Rastreo en tiempo real terminado."); });
+  }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
+}
+
+function cargarGaleriaSupervisor() {
+  var rutaFotos = document.getElementById("selCarpetaMonitoreo").value; 
+  if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
+  
+  var galeria = document.getElementById("galeriaFotosSupervisor"); 
+  galeria.innerHTML = "Cargando y clasificando fotos por bloques de ingeniería..."; 
+  document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
+
+  obtenerToken().then(function(token) {
+    if (!token) return;
+    return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaFotos + ":/children", { headers: { Authorization: "Bearer " + token } })
+      .then(function(r) { return r.json(); }).then(function(json) {
+        galeria.innerHTML = ""; 
+        if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía en este sitio."; return; }
+        
+        var gruposClasificados = {
+          "BLOQUE 1: INSTALACIÓN DE ANTENAS": [],
+          "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR": [],
+          "BLOQUE 3: PDB": [],
+          "BLOQUE 4: SISTEMA PUESTA DE TIERRA": [],
+          "BLOQUE 5: IDU y MARQUILLADO": [],
+          "OTROS ARCHIVOS NO CLASIFICADOS": []
+        };
+
+        json.value.forEach(function(archivo) {
+          var nMin = archivo.name.toLowerCase();
+          var asignado = false;
+
+          if (nMin.includes("antena") || nMin.includes("herraje") || nMin.includes("vista") || nMin.includes("encintado")) {
+            gruposClasificados["BLOQUE 1: INSTALACIÓN DE ANTENAS"].push(archivo); asignado = true;
+          } else if (nMin.includes("cable_if") || nMin.includes("recorrido") || nMin.includes("escalerilla") || nMin.includes("pasamuros") || nMin.includes("rack") || nMin.includes("gabinete") || nMin.includes("curvatora") || nMin.includes("marquillas_de_los_cable")) {
+            gruposClasificados["BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR"].push(archivo); asignado = true;
+          } else if (nMin.includes("pdb") || nMin.includes("breaker") || nMin.includes("48v") || nMin.includes("0v") || nMin.includes("drenaje")) {
+            gruposClasificados["BLOQUE 3: PDB"].push(archivo); asignado = true;
+          } else if (nMin.includes("tierra") || nMin.includes("barraje") || nMin.includes("guaya")) {
+            gruposClasificados["BLOQUE 4: SISTEMA PUESTA DE TIERRA"].push(archivo); asignado = true;
+          } else if (nMin.includes("idu") || nMin.includes("frontal") || nMin.includes("posterior") || nMin.includes("trasero") || nMin.includes("derecho") || nMin.includes("izquierdo") || nMin.includes("marquilla_de_la_idu")) {
+            gruposClasificados["BLOQUE 5: IDU y MARQUILLADO"].push(archivo); asignado = true;
+          }
+
+          if (!asignado) { gruposClasificados["OTROS ARCHIVOS NO CLASIFICADOS"].push(archivo); }
+        });
+
+        Object.keys(gruposClasificados).forEach(function(nombreBloque) {
+          var listaFotosBloque = gruposClasificados[nombreBloque];
+          if (listaFotosBloque.length > 0) {
+            var tituloBloqueDiv = document.createElement("div");
+            tituloBloqueDiv.className = "supervisor-bloque-header";
+            tituloBloqueDiv.textContent = nombreBloque + " (" + listaFotosBloque.length + " fotos)";
+            galeria.appendChild(tituloBloqueDiv);
+
+            var gridDiv = document.createElement("div");
+            gridDiv.className = "grid-supervisor-fotos";
+
+            listaFotosBloque.forEach(function(archivo) {
+              var card = document.createElement("div"); card.className = "card-foto-superv";
+              var img = document.createElement("img"); img.src = archivo["@microsoft.graph.downloadUrl"]; img.addEventListener("click", function() { window.open(archivo.webUrl, "_blank"); });
+              var meta = document.createElement("div"); meta.className = "meta"; meta.textContent = archivo.name.replace(/_/g, " ").replace(".jpg", "");
+              var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑  Rechazar / Eliminar";
+              btnR.addEventListener("click", function() {
+                if (confirm("¿Deseas eliminar esta foto de SharePoint?")) {
+                  fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) { if (r.ok) { alert("Foto eliminada."); cargarGaleriaSupervisor(); } });
+                }
+              });
+              card.appendChild(img); card.appendChild(meta); card.appendChild(btnR); gridDiv.appendChild(card);
+            });
+            galeria.appendChild(gridDiv);
+          }
+        });
+      });
+  });
+}
+
+function mostrarAppPrincipal(esPersonalExterno) {
+  document.getElementById("pantallaLogin").classList.add("oculto");
+  document.getElementById("appPrincipal").classList.remove("oculto");
+  document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
+  document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
+
+  if (esPersonalExterno) {
+    var btnSup = document.getElementById("navSupervisor");
+    if (btnSup) btnSup.classList.add("oculto");
   }
 
-  document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      ubicacionCaptured = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
+      ubicacionCapturada = ubicacionCaptured;
+      document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
+      document.getElementById("gpsStatusBar").classList.add("gps-success");
+    }, null, { enableHighAccuracy: true });
+  }
 
- function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
+  estructuraFotos = MAESTRO_BLOQUES_PLANTILLA.map(function(b) { return { bNom: b.bNom, subNom: b.subNom, item: b.item, estado: "PENDIENTE", fotosList: [] }; });
+  renderizarBloqueFotosDinamicos();
+  actualizarBandejaBorradoresUI();
 
- function iniciarApp() {
+  resolverSitioYDrive()
+    .then(descargarYLeerConfiguracion)
+    .then(function() {
+      var btnBuscarSup = document.getElementById("btnCargarCarpetasActivas");
+      if (btnBuscarSup) { 
+        btnBuscarSup.disabled = esPersonalExterno; 
+        btnBuscarSup.textContent = esPersonalExterno ? "🔒 Panel restringido para externos" : "🔄 Buscar Inspecciones Activas en SharePoint"; 
+      }
+    }).catch(function(e) { console.error(e); });
+}
 
+function descargarYLeerConfiguracion() {
+  return obtenerToken().then(function(token) {
+    if (!token) return;
+    return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
+      .then(function(r) { 
+        if (!r.ok) throw new Error("Código de estado HTTP: " + r.status);
+        return r.text(); 
+      })
+      .then(function(texto) {
+        datosConfiguracion = procesarCSVNativo(texto);
+        var clientes = uniques(datosConfiguracion.map(function(f) { return f.cliente; }));
+        if (clientes.length === 0) {
+          document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Archivo vacío o mal formateado</option>';
+          return;
+        }
+        document.getElementById("selCliente").innerHTML = '<option value="">Selecciona un cliente</option>' + clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
+      })
+      .catch(function(error) {
+        console.error("Error al descargar configuración:", error);
+        document.getElementById("selCliente").innerHTML = '<option value="">⚠️ Error de comunicación con SharePoint</option>';
+      });
+  });
+}
+
+function subirArchivo(token, ruta, contenido) {
+  return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + ruta + ":/content", { method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" }, body: contenido }).then(function(r) { return r.json(); });
+}
+
+function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
+
+// ✅ FLUJO PRINCIPAL DE ARRANQUE Y LOGIN (PASIVO/DEFENSIVO)
+function iniciarApp() {
   msalInstance = new msal.PublicClientApplication({
     auth: {
       clientId: CONFIG.clientId,
@@ -1104,42 +1077,51 @@ function resolverSitioYDrive() {
   });
 
   msalInstance.initialize().then(function () {
-
     var cuentas = msalInstance.getAllAccounts();
+    inicializarEventosFormulario(); // Inicializa los escuchas de clics y selectores de forma segura
 
     if (cuentas.length > 0) {
       cuentaActual = cuentas[0];
-      inicializarBaseDatosMultitarea()
-        .then(validarFiltroYPermisosUsuario);
+      inicializarBaseDatosMultitarea().then(validarFiltroYPermisosUsuario);
     } else {
       document.getElementById("pantallaLogin").classList.remove("oculto");
     }
+  }).catch(function(err){
+    console.error("Fallo inicializando MSAL:", err);
   });
 
-  // ✅ LOGIN
+  // Evento Clic del Botón de Login (Blindado contra interrupciones de caché)
   document.getElementById("btnLogin").addEventListener("click", async function () {
+    var botonLogin = document.getElementById("btnLogin");
+    var divError = document.getElementById("loginError");
+    
+    botonLogin.disabled = true;
+    divError.innerHTML = "<div style='color:var(--naranja); font-weight:600;'>Abriendo ventana segura de Microsoft...</div>";
+
+    // Limpieza previa contra el bug de 'interaction_in_progress'
+    Object.keys(localStorage).forEach(k => { if (k.includes("interaction.status")) localStorage.removeItem(k); });
+    Object.keys(sessionStorage).forEach(k => { if (k.includes("interaction.status")) sessionStorage.removeItem(k); });
 
     try {
-
       const resp = await msalInstance.loginPopup({
         scopes: SCOPES,
         prompt: "select_account"
       });
-
       cuentaActual = resp.account;
-
+      divError.innerHTML = "";
+      botonLogin.disabled = false;
+      
       await inicializarBaseDatosMultitarea();
-      await validarFiltroYPermisosUsuario();
-
+      validarFiltroYPermisosUsuario();
     } catch (err) {
       console.error(err);
-      document.getElementById("loginError").innerHTML =
-        `<div class="error-msg">${err.message}</div>`;
+      botonLogin.disabled = false;
+      divError.innerHTML = `<div class="error-msg">Error de ingreso: ${err.message || "Interrupción."}</div>`;
     }
   });
 
   document.getElementById("btnLogout").addEventListener("click", function () {
-    location.reload();
+    ejecutarCierreSesion();
   });
 }
 
@@ -1154,14 +1136,8 @@ function ejecutarCierreSesion() {
 }
 
 function limpiarCacheMSAL() {
-  Object.keys(localStorage).forEach(k => {
-    if (k.startsWith("msal.")) localStorage.removeItem(k);
-  });
-
-  Object.keys(sessionStorage).forEach(k => {
-    if (k.startsWith("msal.")) sessionStorage.removeItem(k);
-  });
-
+  Object.keys(localStorage).forEach(k => { if (k.startsWith("msal.")) localStorage.removeItem(k); });
+  Object.keys(sessionStorage).forEach(k => { if (k.startsWith("msal.")) sessionStorage.removeItem(k); });
   location.reload();
 }
 
@@ -1175,8 +1151,10 @@ function esperarMSAL(intentos) {
     }, 400);
   }
 }
+
 window.location.hash = "";
 window.addEventListener("load", function() { esperarMSAL(25); });
+document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
 </script>
 </body>
 </html>
