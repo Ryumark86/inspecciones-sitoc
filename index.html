@@ -3,25 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Formulario Multibloque V6.7.5</title>
-<script>
-(function() {
-  var urls = [
-    "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
-    "https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js",
-    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"
-  ];
-  var idx = 0;
-  function cargar() {
-    if (idx >= urls.length) return;
-    var s = document.createElement("script");
-    s.src = urls[idx++];
-    s.onerror = function() { cargar(); };
-    document.head.appendChild(s);
-  }
-  cargar();
-})();
-</script>
+<title>Inspecciones SITOC - Formulario Multibloque V6.7.6</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
@@ -41,7 +23,7 @@
   header h1{font-size:18px;margin:0;font-weight:700;}
   header .sub{font-size:12px;opacity:.8;margin-top:2px;}
   .header-actions{display:flex;gap:8px;}
-  #btnLogout, .btn-nav{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;}
+  .btn-nav{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;}
   .btn-nav-active{background:var(--naranja);border-color:var(--naranja);}
   
   main{max-width:680px;margin:0 auto;padding:20px 16px 80px;}
@@ -51,8 +33,6 @@
   
   .seccion-bloque-titulo {background: var(--azul-osc); color: #fff; padding: 10px 14px; font-size: 14px; font-weight: 700; border-radius: 6px; margin-top: 25px; margin-bottom: 5px; text-transform: uppercase;}
   .seccion-subbloque-titulo {color: var(--naranja); font-size: 13px; font-weight: 600; padding: 4px 14px; margin-bottom: 10px; border-left: 3px solid var(--naranja); background: #fffcf9;}
-
-  .supervisor-bloque-header {background: var(--azul); color: white; padding: 8px 12px; font-size: 13px; font-weight: bold; border-radius: 4px; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase;}
 
   .contenedor-borradores {display: flex; flex-direction: column; gap: 8px; margin-top: 10px;}
   .item-borrador-btn {display: flex; align-items: center; justify-content: space-between; background: #eef7fc; border: 1px solid #bce1f4; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; width: 100%; transition: background 0.2s;}
@@ -99,17 +79,7 @@
   #modalVisorGrande img {max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2);}
   #modalVisorGrande p {color: #fff; margin-top: 14px; font-size: 14px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px;}
 
-  .grid-supervisor-fotos {display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;}
-  .card-foto-superv {background: #fafafa; border: 1px solid var(--gris-borde); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;}
-  .card-foto-superv img {width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid var(--gris-borde); cursor: pointer;}
-  .card-foto-superv .meta {font-size: 12px; font-weight: 600; color: var(--texto); word-break: break-all; min-height: 32px;}
-  .btn-rechazar-superv {width: 100%; padding: 8px; background: var(--rojo); color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;}
-
   input[type=file]{display:none;}
-  #pantallaLogin{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;}
-  #pantallaLogin h1{color:var(--azul-osc);font-size:22px;margin-bottom:8px;}
-  #btnLogin{background:var(--azul);color:#fff;border:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
-  #btnLogin:disabled {background:#c9c9c9; cursor:not-allowed;}
   .oculto{display:none !important;}
   #estadoEnvio{position:fixed;inset:0;background:rgba(8,45,68,.94);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px;text-align:center;}
   .spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:girar 0.8s linear infinite;margin-bottom:18px;}
@@ -121,14 +91,7 @@
 </head>
 <body>
 
-<div id="pantallaLogin">
-  <h1>Inspecciones SITOC</h1>
-  <p>Inicia sesión con tu cuenta de Microsoft (Corporativa o Personal Autorizado).</p>
-  <button id="btnLogin">&#128274; Iniciar sesión con Microsoft</button>
-  <div id="loginError" style="margin-top:16px; max-width:340px;"></div>
-</div>
-
-<div id="appPrincipal" class="oculto">
+<div id="appPrincipal">
   <header>
     <div>
       <h1 id="tituloHeader">Nueva Inspección (Campo)</h1>
@@ -136,8 +99,6 @@
     </div>
     <div class="header-actions">
       <button class="btn-nav btn-nav-active" id="navCampo">Formulario</button>
-      <button class="btn-nav" id="navSupervisor">Escritorio/Supervisor</button>
-      <button id="btnLogout">Salir</button>
     </div>
   </header>
   
@@ -153,7 +114,7 @@
     <div class="card">
       <h2>Ubicación de trabajo</h2>
       <label for="selCliente">Cliente</label>
-      <select id="selCliente"><option value="">Descargando listas desde SharePoint...</option></select>
+      <select id="selCliente"><option value="">Cargando catálogo...</option></select>
       <label for="selProyecto">Proyecto</label>
       <select id="selProyecto" disabled><option value="">Elige un cliente primero</option></select>
       <label for="selActividad">Actividad</label>
@@ -178,31 +139,9 @@
       <div style="padding-left: 10px;" class="subtitulo-bloque">Toma las capturas requeridas por sección. Puedes ir guardando parcialmente.</div>
       
       <div id="contenedorDinamicoBloquesFotos"></div>
-      
-      <button class="btn-bloque" id="btnGuardarFotosGlobal">💾 Subir / Guardar Fotos Capturadas (Parcial)</button>
-      <button class="btn-secundario-bloque" id="btnSincronizarCambiosEscritorio">🔄 Verificar aprobaciones en Escritorio</button>
     </div>
     
     <button class="btn-primario" id="btnEnviar">Enviar inspección definitiva</button>
-  </main>
-
-  <main id="vistaSupervisor" class="oculto">
-    <div class="card">
-      <h2>Panel de Control y Monitoreo en Vivo</h2>
-      <div class="subtitulo-bloque">Visualiza y aprueba el material que los técnicos están capturando en tiempo real.</div>
-      
-      <button class="btn-bloque" id="btnCargarCarpetasActivas" style="margin-bottom:14px; background:var(--indigo);" disabled>🔄 Conectando con SharePoint (Cargando...)</button>
-      
-      <label for="selCarpetaMonitoreo">Seleccionar Inspección en Campo</label>
-      <select id="selCarpetaMonitoreo"><option value="">Haga clic en el botón de arriba para buscar...</option></select>
-    </div>
-
-    <div class="card oculto" id="cardGaleriaSupervisor">
-      <h2>Fotos Recibidas en este Sitio</h2>
-      <div class="subtitulo-bloque">Organizadas automáticamente por bloques de inspección de ingeniería.</div>
-      
-      <div id="galeriaFotosSupervisor"></div>
-    </div>
   </main>
 </div>
 
@@ -227,16 +166,13 @@
 </div>
 
 <script>
-
 var CONFIG = {
-  // 🔑 DATOS DE LA CUENTA DE SERVICIO GENÉRICA SITOC (Para conectar sin login individual)
-  usuarioGenerico: "mark.solano@sitoc.com.co", 
-  claveGenerica: "S1t0c.s4s", 
+  // 🔗 REEMPLAZA ESTE TEXTO POR LA URL LARGA QUE TE ENTREGUE POWER AUTOMATE AL GUARDAR TU FLUJO HTTP POST
+  webhookUrl: "https://defaultef33d41cb3e34e3f958ab0d14b400c.f3.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/4bf0fd979e03433d9bc1bc7b2e7bb975/triggers/manual/paths/invoke?api-version=1", 
 
   hostname: "sitoc.sharepoint.com",
   sitePath: "/sites/INSPECCIONES_EPCC",
   archivoConfiguracion: "configuracion.csv",
-  archivoMaestro: "maestro_inspecciones.csv",
   carpetaRaizInspecciones: "Inspecciones"
 };
 
@@ -249,25 +185,53 @@ var ultimaEstacionSeleccionada = "";
 var bloqueadorEventosDropdowns = false;
 var ubicacionCapturada = null;
 
-function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
+var MAESTRO_BLOQUES_PLANTILLA = [
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto linea de vista de la antena" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto panoramica de la antena lado derecho" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto panoramica de la antena lado izquierdo" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto panoramica de la antena lado superior" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto panorámica de la antena lado inferior" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto panorámica del herraje de la antena" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto de la marquilla acrílica de la antena" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto de la marquilla acrílica tierras odus" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto de la marquilla acrílica cables IF" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto de los encintados RX - TX conexión ODUS" },
+  { bNom: "BLOQUE 1: INSTALACIÓN DE ANTENAS", subNom: "Estructura y Herrajes", item: "Foto de la conexión y termoencogible cable de tierra" },
 
-function procesarCSVNativo(textoPlano) {
-  try {
-    var lineas = textoPlano.split(/\r?\n/); var filasMapeadas = [];
-    if (lineas.length <= 1) return filasMapeadas;
-    for (var i = 0; i < lineas.length; i++) {
-      var linea = lineas[i].trim(); if (!linea) continue;
-      var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
-      var cli = celdas[0] ? celdas[0].trim() : ""; var pro = celdas[1] ? celdas[1].trim() : "";
-      var act = celdas[2] ? celdas[2].trim() : ""; var est = celdas[3] ? celdas[3].trim() : "";
-      if (i === 0 && cli.toLowerCase().includes("client")) continue;
-      if (cli && pro) {
-        filasMapeadas.push({ cliente: cli.toUpperCase(), proyecto: pro.toUpperCase(), actividad: act ? act.toUpperCase() : "INSTALACION", estacion: est ? est.toUpperCase() : "SITIO GENERAL" });
-      }
-    }
-    return filasMapeadas;
-  } catch(e) { return []; }
-}
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido a lo largo de la torre Vertical", item: "Foto panorámica de conexión cable IF - ODU" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido a lo largo de la torre Vertical", item: "Foto panorámica del recorrido en estructura de la torre" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido a lo largo de la torre Vertical", item: "Foto panorámica de inicio de escalerilla vertical" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido a lo largo de la torre Vertical", item: "Foto panorámica del recorrido escalerilla vertical de la mitad hacia abajo" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido a lo largo de la torre Vertical", item: "Foto panorámica del recorrido escalerilla vertical de la mitad hacia arriba" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido a lo largo de la torre Vertical", item: "Foto panorámica del recorrido escalerilla vertical llegando a la escalerilla horizontal" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica de la curvatora de la escalerilla vertical a horizontal" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla horizontal - por tramos de escalerilla" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido e ingreso a pasamuros / gabinete" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido in escalerilla horizontal", item: "Foto panorámica del recorrido escalerilla interior" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto panorámica del recorrido en rack o gabinete and conexión a la IDU" },
+  { bNom: "BLOQUE 2: RECORRIDO DEL CABLEADO IF EXTERIOR/INTERIOR", subNom: "Panoramica de recorrido en escalerilla horizontal", item: "Foto de las marquillas de los cable IF conectados a la IDU" },
+
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica del PDB tapas cerradas" },
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica del PDB tapas abiertas" },
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica de los breakers conectados MAIN/STANDBY" },
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica de la marquilla y conexión +0v MAIN/STANDBY" },
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica de la marquilla y conexión -48v MAIN/STANDBY" },
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica de la marquilla y conexión GND MAIN/STANDBY" },
+  { bNom: "BLOQUE 3: PDB", subNom: "Conexiones PDB", item: "Foto panorámica de la marquilla y conexión hilo de drenaje MAIN/STANDBY" },
+
+  { bNom: "BLOQUE 4: SISTEMA PUESTA DE TIERRA", subNom: "Conexión sistema de tierra", item: "Foto conexión del cable de tierra en IDU y marquilla de tierra" },
+  { bNom: "BLOQUE 4: SISTEMA PUESTA DE TIERRA", subNom: "Conexión sistema de tierra", item: "Foto conexión del cable de tierra en barraje de tierra y marquilla de tierra" },
+  { bNom: "BLOQUE 4: SISTEMA PUESTA DE TIERRA", subNom: "Conexión sistema de tierra", item: "Foto conexión del cable de tierra de las ODUS en guaya y marquillas acrílicas" },
+  { bNom: "BLOQUE 4: SISTEMA PUESTA DE TIERRA", subNom: "Conexión sistema de tierra", item: "Foto conexión del cable de cable de tierra cables IF en torres/barrajes, encintados y marquillas acrílicas" },
+
+  { bNom: "BLOQUE 5: IDU y MARQUILLADO", subNom: "Conexión sistema de tierra", item: "Foto panorámica frontal de la IDU" },
+  { bNom: "BLOQUE 5: IDU y MARQUILLADO", subNom: "Conexión sistema de tierra", item: "Foto de la marquilla de la IDU" },
+  { bNom: "BLOQUE 5: IDU y MARQUILLADO", subNom: "Conexión sistema de tierra", item: "Foto panorámica lado derecho de la IDU" },
+  { bNom: "BLOQUE 5: IDU y MARQUILLADO", subNom: "Conexión sistema de tierra", item: "Foto panorámica lado izquierdo de la IDU" },
+  { bNom: "BLOQUE 5: IDU y MARQUILLADO", subNom: "Conexión sistema de tierra", item: "Foto panorámica lado posterior/trasero de la IDU" }
+];
+
+function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
 
 function inicializarBaseDatosMultitarea() {
   return new Promise(function(resolve, reject) {
@@ -391,13 +355,6 @@ window.cargarBorradorEspecificoClick = function(idSitio) {
   };
 };
 
-// 🔐 CONEXIÓN DIRECTA GENERANDO TOKEN MEDIANTE PASARELA CORPORATIVA GENÉRICA
-async function obtenerToken() {
-  // Flujo simplificado: Devuelve el canal de comunicación corporativo directo
-  // Cuando configures tu API Gateway proxy o credenciales fijas, se inyecta aquí.
-  return "TOKEN_AUTORIZADO_SITOC_GENERICO"; 
-}
-
 function inicializarEventosFormulario() {
   document.getElementById("selCliente").addEventListener("change", function() {
     if (bloqueadorEventosDropdowns) return;
@@ -421,76 +378,69 @@ function inicializarEventosFormulario() {
 
   document.getElementById("selActividad").addEventListener("change", gestionarChangeDeEstacionProactivo);
 
-  document.getElementById("btnGuardarFotosGlobal").addEventListener("click", function() {
-    if (!document.getElementById("selCliente").value || !document.getElementById("inpEstacion").value.trim() || !document.getElementById("inpTecnico").value.trim()) { alert("Faltan datos de ubicación, estación o técnico."); return; }
-    var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
-    ov.classList.remove("oculto"); var rb = obtenerRutaCarpetaInspeccion();
-
-    obtenerToken().then(function(token) {
-      var list = [];
-      estructuraFotos.forEach(function(item) {
-        if (item.estado === "TOMADA" || item.estado === "SUBIDA") {
-          item.fotosList.forEach(function(fObj, idx) {
-            if (!fObj.subido) {
-              var nArch = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
-              fObj.filename = nArch;
-              list.push({ ruta: rb + "/fotos/" + nArch, file: fObj.file, itemRef: item, fotoRef: fObj });
-            }
-          });
-        }
-      });
-      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas por subir."); return; }
-      var i = 0;
-      function secuencial() {
-        if (i >= list.length) return Promise.resolve();
-        oT.textContent = "Guardando en la nube: " + (i + 1) + " de " + list.length + "...";
-        var el = list[i]; return subirArchivo(token, el.ruta, el.file).then(function() { el.fotoRef.subido = true; el.itemRef.estado = "SUBIDA"; i++; return secuencial(); });
-      }
-      return secuencial().then(function() { 
-        ov.classList.add("oculto"); alert("¡Fotos guardadas con éxito en SharePoint!"); renderizarBloqueFotosDinamicos(); 
-        guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
-      });
-    }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
-  });
-
+  // 🚀 ENVÍO CONSOLIDADO DIRECTO A POWER AUTOMATE
   document.getElementById("btnEnviar").addEventListener("click", function() {
     if (!document.getElementById("selCliente").value || !document.getElementById("inpEstacion").value.trim() || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos de texto del formulario."); return; }
-    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Consolidando todo el material y enviando reporte a SharePoint...";
+    
+    var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
+    ov.classList.remove("oculto");
+    oT.textContent = "Preparando empaquetado y cargando imágenes...";
+    
     var rb = obtenerRutaCarpetaInspeccion();
-    var d = { cliente: document.getElementById("selCliente").value, proyecto: document.getElementById("selProyecto").value, actividad: document.getElementById("selActividad").value, estacion: document.getElementById("inpEstacion").value.trim(), tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notes: document.getElementById("inpNotas").value.trim() };
+    var formData = new FormData();
+    formData.append("cliente", document.getElementById("selCliente").value);
+    formData.append("proyecto", document.getElementById("selProyecto").value);
+    formData.append("actividad", document.getElementById("selActividad").value);
+    formData.append("estacion", document.getElementById("inpEstacion").value.trim());
+    formData.append("tecnico", document.getElementById("inpTecnico").value.trim());
+    formData.append("fecha", document.getElementById("inpFecha").value);
+    formData.append("notas", document.getElementById("inpNotas").value.trim());
+    formData.append("gps", ubicacionCapturada || "Sin GPS");
+    formData.append("rutaCarpeta", rb);
 
-    obtenerToken().then(function(token) {
-      var subidasPendientes = [];
-      estructuraFotos.forEach(function(item) {
-        if (item.estado === "TOMADA") {
-          item.fotosList.forEach(function(fObj, index) {
-            if (!fObj.subido) {
-              var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (index + 1) + ".jpg";
-              fObj.filename = nombreArchivo; subidasPendientes.push({ ruta: rb + "/fotos/" + nombreArchivo, file: fObj.file, itemRef: item, fotoRef: fObj });
-            }
-          });
-        }
-      });
-      var sIdx = 0;
-      function vaciarUltimas() {
-        if (sIdx >= subidasPendientes.length) return Promise.resolve();
-        var tgt = subidasPendientes[sIdx]; return subirArchivo(token, tgt.ruta, tgt.file).then(function(){ tgt.fotoRef.subido = true; tgt.itemRef.estado = "SUBIDA"; sIdx++; return vaciarUltimas(); });
+    var csvContent = "REPORTE GENERAL\nCampo;Valor\nCliente;" + formData.get("cliente") + "\nEstacion;" + formData.get("estacion") + "\nTecnico;" + formData.get("tecnico") + "\nGPS;" + formData.get("gps") + "\nNotas;" + formData.get("notas");
+    formData.append("archivo_csv", new Blob(["\uFEFF" + csvContent], { type: "text/csv;" }), "reporte_inspeccion.csv");
+
+    var totalFotosAdjuntas = 0;
+    estructuraFotos.forEach(function(item) {
+      if (item.estado === "TOMADA" || item.estado === "SUBIDA") {
+        item.fotosList.forEach(function(fObj, index) {
+          var nombreArchivo = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (index + 1) + ".jpg";
+          formData.append("fotos_inspeccion", fObj.file, nombreArchivo);
+          totalFotosAdjuntas++;
+        });
       }
-      return vaciarUltimas().then(function() {
-        var csv = "REPORTE GENERAL\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS") + "\nNotas;" + d.notes;
-        return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }));
-      }).then(function() {
-        if (dbInspecciones && ultimaEstacionSeleccionada) {
-          var tx = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
-          tx.objectStore("borradores_estaciones").delete(ultimaEstacionSeleccionada);
-        }
-        ov.classList.add("oculto"); 
-        document.getElementById("appPrincipal").classList.add("oculto");
-        document.getElementById("pantallaExito").classList.remove("oculto"); 
-        document.getElementById("exitoDetalle").textContent = "Inspección guardada y bitácora de 5 bloques registrada en la nube.";
-      });
-    }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
+    });
+
+    if (totalFotosAdjuntas === 0) {
+      ov.classList.add("oculto");
+      alert("No has tomado ninguna foto válida para transmitir.");
+      return;
+    }
+
+    oT.textContent = "Transmitiendo " + totalFotosAdjuntas + " fotos a la central Power Automate...";
+
+    fetch(CONFIG.webhookUrl, {
+      method: "POST",
+      body: formData
+    })
+    .then(function(response) {
+      if (!response.ok) throw new Error("El canal de Power Automate rechazó el paquete (Código HTTP " + response.status + ")");
+      
+      if (dbInspecciones && ultimaEstacionSeleccionada) {
+        var tx = dbInspecciones.transaction(["borradores_estaciones"], "readwrite");
+        tx.objectStore("borradores_estaciones").delete(ultimaEstacionSeleccionada);
+      }
+      
+      ov.classList.add("oculto"); 
+      document.getElementById("appPrincipal").classList.add("oculto");
+      document.getElementById("pantallaExito").classList.remove("oculto"); 
+      document.getElementById("exitoDetalle").textContent = "¡Inspección transmitida con éxito! Power Automate procesará las " + totalFotosAdjuntas + " fotos en tu SharePoint.";
+    })
+    .catch(function(e) { 
+      ov.classList.add("oculto"); 
+      alert("⚠️ FALLO CRÍTICO DE TRANSMISIÓN:\n" + e.message + "\n\nVerifica que la URL del webhook en el objeto CONFIG sea la correcta."); 
+    });
   });
 
   document.getElementById("inputCamaraDirecta").addEventListener("change", function(e) { procesarArchivosCargados(Array.from(e.target.files)); e.target.value = ""; });
@@ -553,8 +503,8 @@ function renderizarBloqueFotosDinamicos() {
     var est = document.createElement("div"); est.className = "foto-item-status";
     
     if (foto.estado === "PENDIENTE") { est.textContent = "❌ Pendiente local"; est.className += " status-pendiente"; }
-    else if (foto.estado === "TOMADA") { est.textContent = "📸 " + foto.fotosList.length + " por guardar"; est.className += " status-tomada"; }
-    else if (foto.estado === "SUBIDA") { est.textContent = "☁ Sincronizada en SharePoint (" + foto.fotosList.length + ")"; est.className += " status-subida"; }
+    else if (foto.estado === "TOMADA") { est.textContent = "📸 " + foto.fotosList.length + " listas para envío"; est.className += " status-tomada"; }
+    else if (foto.estado === "SUBIDA") { est.textContent = "☁ Listas para envío (" + foto.fotosList.length + ")"; est.className += " status-subida"; }
     else if (foto.estado === "NA") { est.textContent = "🚫 No Aplica"; est.className += " status-na"; }
 
     info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
@@ -628,6 +578,30 @@ function estamparMarcaDeAgua(f, c, e, h, cb) {
   };
 }
 
+// ✅ FUNCIONES DE SOPORTE INTEGRADAS: CONTROL DE ELIMINACIÓN Y VISOR GRANDE DE FOTOS
+function eliminarFotoEspecifica(bloqueIdx, fotoIdx) {
+  var item = estructuraFotos[bloqueIdx];
+  if (item && item.fotosList[fotoIdx]) {
+    var fObj = item.fotosList[fotoIdx];
+    if (fObj.previewUrl) URL.revokeObjectURL(fObj.previewUrl);
+    item.fotosList.splice(fotoIdx, 1);
+    if (item.fotosList.length === 0) item.estado = "PENDIENTE";
+    renderizarBloqueFotosDinamicos();
+    guardarBorradorLocalEnBaseDatos(ultimaEstacionSeleccionada, estructuraFotos, document.getElementById("inpNotas").value);
+  }
+}
+
+function abrirVisorGrande(url) {
+  var modal = document.getElementById("modalVisorGrande");
+  var target = document.getElementById("imgVisorGrandeTarget");
+  target.src = url;
+  modal.classList.remove("oculto");
+}
+
+document.getElementById("modalVisorGrande").addEventListener("click", function() {
+  this.classList.add("oculto");
+});
+
 function obtenerRutaCarpetaInspeccion() {
   var c = document.getElementById("selCliente").value || "CLIENTE_SITIO", p = document.getElementById("selProyecto").value || "PROYECTO_SITIO";
   var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
@@ -636,38 +610,29 @@ function obtenerRutaCarpetaInspeccion() {
   return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + limpiarNombre(est) + "_" + f + "_" + ahoraHora + "_" + limpiarNombre(t);
 }
 
-function subirArchivo(token, ruta, contenido) {
-  // Proxy directo a la API de SharePoint usando el canal genérico autorizado
-  return fetch("https://graph.microsoft.com/v1.0/drives/root:/" + ruta + ":/content", { 
-    method: "PUT", 
-    headers: { "Content-Type": "application/octet-stream" }, 
-    body: contenido 
-  }).then(function(r) { return r.json(); });
-}
-
 function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 
-// 🚀 ACCESO DIRECTO INMEDIATO SIN PANTALLA DE LOGIN
-function iniciarAppDirecta() {
+// 🚀 ACCESO DIRECTO E INICIALIZACIÓN SIN LOGIN
+function iniciarAppDirectaConAutomatizacion() {
   inicializarEventosFormulario();
   
-  // Oculta la pantalla de login vieja por completo y despliega la UI principal
-  document.getElementById("pantallaLogin").classList.add("oculto");
+  document.getElementById("pantallaLogin").style.display = "none";
   document.getElementById("appPrincipal").classList.remove("oculto");
-  
-  // Ocultar acciones de supervisor individuales innecesarias
-  var btnSup = document.getElementById("navSupervisor");
-  if (btnSup) btnSup.classList.add("oculto");
 
-  document.getElementById("nombreUsuario").textContent = "Acceso Técnico de Campo Abierto";
+  document.getElementById("nombreUsuario").textContent = "Técnico de Campo (Modo Transmisión Abierta)";
   document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
 
+  // ✅ SOLUCIÓN #1: Ajuste de variable global de geolocalización para evitar fallas nativas en Android/iOS
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
-      ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
+      var coordenadasFijadas = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
+      ubicacionCapturada = coordenadasFijadas;
       document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
       document.getElementById("gpsStatusBar").classList.add("gps-success");
-    }, null, { enableHighAccuracy: true });
+    }, function(err) {
+      console.warn("GPS falló o fue denegado:", err.message);
+      document.getElementById("gpsStatusTexto").textContent = "⚠️ GPS inactivo (Se enviará como Sin GPS)";
+    }, { enableHighAccuracy: true, timeout: 8000 });
   }
 
   estructuraFotos = MAESTRO_BLOQUES_PLANTILLA.map(function(b) { return { bNom: b.bNom, subNom: b.subNom, item: b.item, estado: "PENDIENTE", fotosList: [] }; });
@@ -675,9 +640,20 @@ function iniciarAppDirecta() {
   
   inicializarBaseDatosMultitarea().then(function() {
     actualizarBandejaBorradoresUI();
+    
+    // ✅ SOLUCIÓN #2: Catálogo duro para los técnicos en campo. Puedes expandir este arreglo con tus proyectos reales de SITOC
+    datosConfiguracion = [
+      { cliente: "CLARO", proyecto: "PROYECTO CR EXCLUSIVO", actividad: "INSTALACIÓN DE ANTENAS" },
+      { cliente: "CLARO", proyecto: "PROYECTO CR EXCLUSIVO", actividad: "RECORRIDO DE CABLEADO IF" },
+      { cliente: "MOVISTAR", proyecto: "MANTENIMIENTO MOV-2026", actividad: "SISTEMA PUESTA DE TIERRA" }
+    ]; 
+    var clientes = uniques(datosConfiguracion.map(function(f) { return f.cliente; }));
+    document.getElementById("selCliente").innerHTML = '<option value="">Selecciona un cliente</option>' + clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
   });
 }
 
-window.addEventListener("load", iniciarAppDirecta);
+window.addEventListener("load", iniciarAppDirectaConAutomatizacion);
 document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
 </script>
+</body>
+</html>
