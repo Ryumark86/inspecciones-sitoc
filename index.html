@@ -1,726 +1,210 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspecciones SITOC - Panel Unificado V3</title>
-<script>
-(function() {
-  var urls = [
-    "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
-    "https://unpkg.com/@azure/msal-browser@2.38.3/lib/msal-browser.min.js",
-    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"
-  ];
-  var idx = 0;
-  function cargar() {
-    if (idx >= urls.length) return;
-    var s = document.createElement("script");
-    s.src = urls[idx++];
-    s.onerror = function() { cargar(); };
-    document.head.appendChild(s);
-  }
-  cargar();
-})();
-</script>
-<style>
-  :root{
-    --azul:#0b3d5c;
-    --azul-osc:#082d44;
-    --naranja:#e8731c;
-    --gris-claro:#f4f6f8;
-    --gris-borde:#d3dbe2;
-    --texto:#1c2b36;
-    --verde:#2e7d4f;
-    --rojo:#c0392b;
-    --indigo:#3f51b5;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--gris-claro);color:var(--texto);}
-  header{background:var(--azul);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
-  header h1{font-size:18px;margin:0;font-weight:700;}
-  header .sub{font-size:12px;opacity:.8;margin-top:2px;}
-  .header-actions{display:flex;gap:8px;}
-  #btnLogout, .btn-nav{background:transparent;border:1px solid rgba(255,255,255,.5);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;cursor:pointer;}
-  .btn-nav-active{background:var(--naranja);border-color:var(--naranja);}
-  
-  main{max-width:680px;margin:0 auto;padding:20px 16px 80px;}
-  .card{background:#fff;border-radius:10px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid var(--gris-borde);}
-  .card h2{font-size:15px;margin:0 0 4px;color:var(--azul-osc);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
-  .card .subtitulo-bloque{font-size:13px;color:#7c8a94;margin-bottom:14px;font-weight:500;}
-  
-  label{display:block;font-size:14px;font-weight:600;margin-bottom:6px;color:var(--texto);}
-  select,input[type=text],input[type=date],textarea{width:100%;padding:13px 12px;font-size:16px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:14px;background:#fff;color:var(--texto);font-family:inherit;}
-  select:disabled,input:disabled{background:#eef1f3;color:#8a97a1;}
-  textarea{resize:vertical;min-height:80px;}
-  
-  .btn-primario{width:100%;padding:16px;background:var(--naranja);border:none;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;margin-top:6px;}
-  
-  .btn-bloque{width:100%;padding:12px;background:var(--azul);border:none;color:#fff;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}
-  .btn-secundario-bloque{width:100%;padding:10px;background:#fff;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;}
-
-  .gps-status-bar {font-size: 13px; padding: 10px; border-radius: 6px; background: #eef1f3; margin-bottom: 14px; font-weight: 500;}
-  .gps-success {color: var(--verde); background: #e6f4ea;}
-
-  .foto-item-row {border-bottom: 1px solid var(--gris-borde); padding: 16px 0; display: flex; flex-direction: column; gap: 10px;}
-  .foto-item-row:last-child {border-bottom: none;}
-  .foto-item-header {display: flex; align-items: center; justify-content: space-between; gap: 12px;}
-  .foto-item-info {flex: 1;}
-  .foto-item-title {font-size: 14px; font-weight: 600; color: var(--texto);}
-  .foto-item-status {font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 2px;}
-  .status-pendiente {color: #7c8a94;}
-  .status-tomada {color: var(--verde);}
-  .status-na {color: #7f8c8d;}
-  .status-subida {color: #2980b9;}
-  
-  .foto-item-actions-layout {display: flex; gap: 6px;}
-  .btn-accion-foto {background: var(--azul); color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
-  .btn-accion-na {background: #eef1f3; color: var(--texto); border: 1px solid var(--gris-borde); padding: 8px 10px; border-radius: 6px; font-size: 12px;}
-
-  .thumbs-container {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; background: #fafafa; padding: 8px; border-radius: 8px; border: 1px dashed var(--gris-borde);}
-  .thumb-wrapper {position: relative; width: 75px; height: 75px; border-radius: 6px; overflow: hidden; border: 1px solid var(--gris-borde); background: #eee;}
-  .thumb-wrapper img {width: 100%; height: 100%; object-fit: cover; cursor: pointer;}
-  .btn-borrar-foto {position: absolute; top: 2px; right: 2px; background: rgba(192, 57, 43, 0.9); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; padding: 0; z-index: 2;}
-
-  /* VENTANA OPCIONES ORIGEN FOTO (MENU EMERGENTE) */
-  #modalOrigenFoto {position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: flex; align-items: flex-end; justify-content: center;}
-  .origen-sheet {background: #fff; width: 100%; max-width: 500px; border-radius: 16px 16px 0 0; padding: 20px; box-shadow: 0 -4px 12px rgba(0,0,0,0.15);}
-  .origen-sheet h3 {margin: 0 0 16px; font-size: 16px; color: var(--azul-osc); text-align: center;}
-  .origen-opciones {display: flex; flex-direction: column; gap: 10px;}
-  .btn-origen {width: 100%; padding: 14px; border-radius: 8px; border: 1px solid var(--gris-borde); font-size: 16px; font-weight: 600; background: #fafafa; cursor: pointer; text-align: center; color: var(--texto);}
-  .btn-origen-cancelar {background: #eef1f3; border: none; color: var(--rojo); margin-top: 6px;}
-
-  #modalVisorGrande {position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; cursor: pointer;}
-  #modalVisorGrande img {max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2);}
-  #modalVisorGrande p {color: #fff; margin-top: 14px; font-size: 14px; background: rgba(0,0,0,0.5); padding: 8px 16px; border-radius: 20px;}
-
-  .grid-supervisor-fotos {display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 14px;}
-  .card-foto-superv {background: #fafafa; border: 1px solid var(--gris-borde); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;}
-  .card-foto-superv img {width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid var(--gris-borde); cursor: pointer;}
-  .card-foto-superv .meta {font-size: 12px; font-weight: 600; color: var(--texto); word-break: break-all; min-height: 32px;}
-  .btn-rechazar-superv {width: 100%; padding: 8px; background: var(--rojo); color: #fff; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;}
-
-  input[type=file]{display:none;}
-  #pantallaLogin{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;}
-  #pantallaLogin h1{color:var(--azul-osc);font-size:22px;margin-bottom:8px;}
-  #btnLogin{background:var(--azul);color:#fff;border:none;padding:16px 32px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;}
-  .oculto{display:none !important;}
-  #estadoEnvio{position:fixed;inset:0;background:rgba(8,45,68,.94);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px;text-align:center;}
-  .spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:girar 0.8s linear infinite;margin-bottom:18px;}
-  @keyframes girar{to{transform:rotate(360deg);}}
-  #pantallaExito{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:24px;}
-  .check{width:64px;height:64px;background:var(--verde);border-radius:50%;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Fotográfico SITOC</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 15px; background-color: #f4f5f7; color: #333; }
+        .bloque { background: white; padding: 20px; margin-bottom: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid #0052cc; }
+        h2.titulo-principal { text-align: center; color: #172b4d; margin-bottom: 20px; }
+        h3.titulo-bloque { margin-top: 0; color: #0052cc; font-size: 18px; text-transform: uppercase; border-bottom: 2px solid #eaecf0; padding-bottom: 5px; }
+        .subtitulo-seccion { background-color: #ebecf0; padding: 6px 12px; font-weight: bold; margin-top: 15px; margin-bottom: 15px; border-radius: 4px; color: #42526e; font-size: 14px; }
+        .foto-item { margin-bottom: 15px; padding-left: 5px; }
+        label { display: block; font-weight: 500; margin-bottom: 5px; font-size: 13px; color: #172b4d; }
+        input[type="file"] { display: block; margin-top: 5px; width: 100%; box-sizing: border-box; }
+        #btnEnviar { background-color: #0052cc; color: white; border: none; padding: 15px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        #btnEnviar:disabled { background-color: #a5adba; cursor: not-allowed; }
+        #estado { margin-top: 15px; font-weight: bold; padding: 12px; border-radius: 4px; font-size: 14px; text-align: center; }
+        .info { background-color: #deebff; color: #0747a6; border: 1px solid #0747a6; }
+        .success { background-color: #e3fcef; color: #006644; border: 1px solid #006644; }
+        .error { background-color: #ffebe6; color: #bf2600; border: 1px solid #bf2600; }
+    </style>
 </head>
 <body>
 
-<div id="pantallaLogin">
-  <h1>Inspecciones SITOC</h1>
-  <p>Inicia sesión con tu cuenta corporativa.</p>
-  <button id="btnLogin">&#128274; Iniciar sesión con Microsoft</button>
-</div>
-
-<div id="appPrincipal" class="oculto">
-  <header>
-    <div>
-      <h1 id="tituloHeader">Nueva Inspección (Campo)</h1>
-      <div class="sub" id="nombreUsuario"></div>
-    </div>
-    <div class="header-actions">
-      <button class="btn-nav btn-nav-active" id="navCampo">Formulario</button>
-      <button class="btn-nav" id="navSupervisor">Escritorio/Supervisor</button>
-      <button id="btnLogout">Salir</button>
-    </div>
-  </header>
-  
-  <main id="vistaCampo">
-    <div class="card">
-      <h2>Ubicación de trabajo</h2>
-      <label for="selCliente">Cliente</label>
-      <select id="selCliente"><option value="">Descargando listas desde SharePoint...</option></select>
-      <label for="selProyecto">Proyecto</label>
-      <select id="selProyecto" disabled><option value="">Elige un cliente primero</option></select>
-      <label for="selActividad">Actividad</label>
-      <select id="selActividad" disabled><option value="">Elige un proyecto primero</option></select>
-      <label for="selEstacion">Estación o sitio de trabajo</label>
-      <select id="selEstacion" disabled><option value="">Elige una actividad primero</option></select>
-    </div>
-    <div class="card">
-      <h2>Datos generales</h2>
-      <label for="inpTecnico">Técnico</label>
-      <input type="text" id="inpTecnico" placeholder="Tu nombre completo">
-      <label for="inpFecha">Fecha</label>
-      <input type="date" id="inpFecha">
-      <div id="gpsStatusBar" class="gps-status-bar">&#128205; <span id="gpsStatusTexto">Buscando coordenadas GPS automáticamente...</span></div>
-      <label for="inpNotas">Notes / observaciones generales</label>
-      <textarea id="inpNotas" placeholder="Describe lo encontrado..."></textarea>
-    </div>
-    
-    <div class="card">
-      <h2>BLOQUE 1: INSTALACIÓN DE ANTENAS</h2>
-      <div class="subtitulo-bloque">Guarda el bloque para que el supervisor valide desde el escritorio.</div>
-      <div id="listaFotosEstructurada"></div>
-      
-      <button class="btn-bloque" id="btnGuardarBloque1">💾 Subir / Guardar Fotos de este Bloque</button>
-      <button class="btn-secundario-bloque" id="btnSincronizarCambiosEscritorio">🔄 Verificar fotos aprobadas en Escritorio</button>
-    </div>
-    
-    <button class="btn-primario" id="btnEnviar">Enviar inspección definitiva</button>
-  </main>
-
-  <main id="vistaSupervisor" class="oculto">
-    <div class="card">
-      <h2>Panel de Control y Monitoreo en Vivo</h2>
-      <div class="subtitulo-bloque">Visualiza y aprueba el material que los técnicos están capturando en tiempo real.</div>
-      
-      <button class="btn-bloque" id="btnCargarCarpetasActivas" style="margin-bottom:14px; background:var(--indigo);">🔄 Buscar Inspecciones Activas en SharePoint</button>
-      
-      <label for="selCarpetaMonitoreo">Seleccionar Inspección en Campo</label>
-      <select id="selCarpetaMonitoreo"><option value="">Haga clic en el botón de arriba para buscar...</option></select>
-    </div>
-
-    <div class="card oculto" id="cardGaleriaSupervisor">
-      <h2>Fotos Recibidas en este Sitio</h2>
-      <div class="subtitulo-bloque">Si una foto no cumple los criterios, presione "Rechazar" para eliminarla.</div>
-      
-      <div id="galeriaFotosSupervisor" class="grid-supervisor-fotos"></div>
-    </div>
-  </main>
-</div>
-
-<input type="file" id="inputCapturaCamara" accept="image/*" capture="environment">
-<input type="file" id="inputCapturaGaleria" accept="image/*" multiple>
-
-<div id="modalOrigenFoto" class="oculto">
-  <div class="origen-sheet">
-    <h3>¿Cómo deseas añadir la foto?</h3>
-    <div class="origen-opciones">
-      <button class="btn-origen" id="btnLlamarCamara">📸 Tomar Foto con Cámara</button>
-      <button class="btn-origen" id="btnLlamarGaleria">📁 Seleccionar de Galería</button>
-      <button class="btn-origen btn-origen-cancelar" id="btnCancelarOrigen">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<div id="modalVisorGrande" class="oculto">
-  <img id="imgVisorGrandeTarget" src="" alt="Vista Previa">
-  <p>Toca la pantalla para regresar</p>
-</div>
-
-<div id="estadoEnvio" class="oculto">
-  <div class="spinner"></div>
-  <p id="estadoEnvioTexto">Procesando...</p>
-</div>
-
-<div id="pantallaExito" class="oculto">
-  <div class="check">&#10003;</div>
-  <h2>Operación Completada</h2>
-  <p id="exitoDetalle"></p>
-  <button class="btn-primario" id="btnNuevaInspeccion" style="max-width:280px;">Volver</button>
-</div>
+    <h2 class="titulo-principal">Control de Instalación de Campo - SITOC</h2>
+    <div id="estado" class="info">Cargando catálogo de ingeniería desde CSV...</div>
+    <div id="formularioContenedor"></div>
+    <button id="btnEnviar" disabled>Enviar Reporte a Power Automate</button>
 
 <script>
+// ==========================================
+// CONFIGURACIÓN DEL FLUJO
+// ==========================================
 var CONFIG = {
-  clientId: "8327d9b9-cf52-4245-9cdb-6f7a994ab69c",
-  tenantId: "ef33d41c-b3e3-4e3f-958a-b0d14b400cf3",
-  redirectUri: window.location.origin + window.location.pathname,
-  hostname: "sitoc.sharepoint.com",
-  sitePath: "/sites/INSPECCIONES_EPCC",
-  archivoConfiguracion: "configuracion.csv",
-  archivoMaestro: "maestro_inspecciones.csv",
-  carpetaRaizInspecciones: "Inspecciones"
+    // 🔗 REEMPLAZA ESTO CON TU URL LARGA DE POWER AUTOMATE
+    webhookUrl: "TU_URL_DE_POWER_AUTOMATE_AQUÍ",
+    archivoConfiguracion: "configuracion.csv",
+    carpetaRaizInspecciones: "Inspecciones"
 };
 
-var ITEMS_FOTOS_PLANTILLA = [
-  "Foto linea de vista de la antena",
-  "Foto panoramica de la antena lado derecho",
-  "Foto panoramica de la antena lado izquierdo",
-  "Foto panoramica de la antena lado superior",
-  "Foto panorámica de la antena lado inferior",
-  "Foto panorámica del herraje de la antena",
-  "Foto de la marquilla acrílica de la antena",
-  "Foto de la marquilla acrílica tierras odus",
-  "Foto de la marquilla acrílica cables IF",
-  "Foto de los encintados RX - TX conexión ODUS",
-  "Foto de la conexión y termoencogible cable de tierra"
-];
+// ==========================================
+// CARGA Y PARSEO DEL ARCHIVO CSV
+// ==========================================
+window.onload = function() {
+    cargarCatalogoCSV();
+};
 
-function procesarCSVNativo(textoPlano) {
-  try {
-    var lineas = textoPlano.split(/\r?\n/);
-    var filasMapeadas = [];
-    for (var i = 0; i < lineas.length; i++) {
-      var linea = lineas[i].trim(); if (!linea) continue;
-      var celdas = linea.includes(";") ? linea.split(";") : linea.split(",");
-      var cli = celdas[0] ? celdas[0].trim() : "";
-      var pro = celdas[1] ? celdas[1].trim() : "";
-      var act = celdas[2] ? celdas[2].trim() : "";
-      var est = celdas[3] ? celdas[3].trim() : "";
-      if (i === 0 && cli.toLowerCase().includes("client")) continue;
-      if (cli && pro) {
-        filasMapeadas.push({ cliente: cli.toUpperCase(), proyecto: pro.toUpperCase(), actividad: act ? act.toUpperCase() : "INSTALACION", estacion: est ? est.toUpperCase() : "SITIO GENERAL" });
-      }
-    }
-    return filasMapeadas;
-  } catch(e) { return []; }
-}
-
-function iniciarApp() {
-  var msalConfig = {
-    auth: { clientId: CONFIG.clientId, authority: "https://login.microsoftonline.com/" + CONFIG.tenantId, redirectUri: CONFIG.redirectUri },
-    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
-  };
-
-  var msalInstance = new msal.PublicClientApplication(msalConfig);
-  var SCOPES = ["User.Read", "Sites.ReadWrite.All"];
-  var cuentaActual = null; var siteId = null; var driveId = null;
-  var datosConfiguracion = []; var msalInicializado = false;
-  var estructuraFotos = []; var ubicacionCapturada = null;
-  var indiceItemSeleccionado = null; var procesandoMarcasDeAgua = 0;
-
-  msalInstance.initialize().then(function() {
-    return msalInstance.handleRedirectPromise();
-  }).then(function() {
-    msalInicializado = true;
-    var cuentas = msalInstance.getAllAccounts();
-    if (cuentas.length > 0) { cuentaActual = cuentas[0]; mostrarAppPrincipal(); } 
-    else { document.getElementById("pantallaLogin").classList.remove("oculto"); }
-  }).catch(function() { document.getElementById("pantallaLogin").classList.remove("oculto"); });
-
-  document.getElementById("btnLogin").addEventListener("click", function() {
-    if (msalInicializado) msalInstance.loginRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri });
-  });
-  document.getElementById("btnLogout").addEventListener("click", function() { msalInstance.logoutRedirect(); });
-
-  document.getElementById("navCampo").addEventListener("click", function() {
-    document.getElementById("navCampo").classList.add("btn-nav-active");
-    document.getElementById("navSupervisor").classList.remove("btn-nav-active");
-    document.getElementById("vistaCampo").classList.remove("oculto");
-    document.getElementById("vistaSupervisor").classList.add("oculto");
-    document.getElementById("tituloHeader").textContent = "Nueva Inspección (Campo)";
-  });
-
-  document.getElementById("navSupervisor").addEventListener("click", function() {
-    document.getElementById("navSupervisor").classList.add("btn-nav-active");
-    document.getElementById("navCampo").classList.remove("btn-nav-active");
-    document.getElementById("vistaSupervisor").classList.remove("oculto");
-    document.getElementById("vistaCampo").classList.add("oculto");
-    document.getElementById("tituloHeader").textContent = "Panel de Supervisión (Escritorio)";
-  });
-
-  function obtenerToken() {
-    return msalInstance.acquireTokenSilent({ scopes: SCOPES, account: cuentaActual })
-      .then(function(r) { return r.accessToken; })
-      .catch(function() { return msalInstance.acquireTokenRedirect({ scopes: SCOPES, redirectUri: CONFIG.redirectUri }); });
-  }
-
-  function mostrarAppPrincipal() {
-    document.getElementById("pantallaLogin").classList.add("oculto");
-    document.getElementById("appPrincipal").classList.remove("oculto");
-    document.getElementById("nombreUsuario").textContent = cuentaActual.name || cuentaActual.username;
-    document.getElementById("inpFecha").value = new Date().toISOString().split("T")[0];
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(pos) {
-        ubicacionCapturada = pos.coords.latitude.toFixed(6) + ", " + pos.coords.longitude.toFixed(6);
-        document.getElementById("gpsStatusTexto").textContent = "Coordenadas fijadas: " + ubicacionCapturada;
-        document.getElementById("gpsStatusBar").classList.add("gps-success");
-      }, null, { enableHighAccuracy: true });
-    }
-
-    estructuraFotos = ITEMS_FOTOS_PLANTILLA.map(function(n) { return { item: n, estado: "PENDIENTE", fotosList: [] }; });
-    renderizarBloqueFotos();
-
-    resolverSitioYDrive()
-      .then(descargarYLeerConfiguracion)
-      .catch(function(e) { console.error(e); });
-  }
-
-  function resolverSitioYDrive() {
-    return obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/sites/" + CONFIG.hostname + ":" + CONFIG.sitePath, { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.json(); })
-        .then(function(sitio) {
-          siteId = sitio.id;
-          return fetch("https://graph.microsoft.com/v1.0/sites/" + siteId + "/drive", { headers: { Authorization: "Bearer " + token } });
-        }).then(function(r) { return r.json(); })
-        .then(function(drive) { driveId = drive.id; });
-    });
-  }
-
-  function descargarYLeerConfiguracion() {
-    return obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoConfiguracion + ":/content", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.ok ? r.text() : ""; })
-        .then(function(texto) {
-          datosConfiguracion = procesarCSVNativo(texto);
-          var clientes = uniques(datosConfiguracion.map(function(f) { return f.cliente; }));
-          selCliente.innerHTML = '<option value="">Selecciona un cliente</option>' + clientes.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join("");
-        });
-    });
-  }
-
-  function uniques(arr) { return arr.filter(function(v, i, a) { return a.indexOf(v) === i; }); }
-
-  var selCliente = document.getElementById("selCliente");
-  var selProyecto = document.getElementById("selProyecto");
-  var selActividad = document.getElementById("selActividad");
-  var selEstacion = document.getElementById("selEstacion");
-
-  selCliente.addEventListener("change", function() {
-    var c = selCliente.value; selProyecto.innerHTML = '<option value="">Selecciona un proyecto</option>';
-    selActividad.disabled = selEstacion.disabled = true; if (!c) { selProyecto.disabled = true; return; }
-    var p = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c; }).map(function(f) { return f.proyecto; }));
-    selProyecto.innerHTML += p.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-    selProyecto.disabled = false;
-  });
-
-  selProyecto.addEventListener("change", function() {
-    var c = selCliente.value, p = selProyecto.value; selActividad.innerHTML = '<option value="">Selecciona una actividad</option>';
-    selEstacion.disabled = true; if (!p) { selActividad.disabled = true; return; }
-    var a = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p; }).map(function(f) { return f.actividad; }));
-    selActividad.innerHTML += a.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-    selActividad.disabled = false;
-  });
-
-  selActividad.addEventListener("change", function() {
-    var c = selCliente.value, p = selProyecto.value, a = selActividad.value; selEstacion.innerHTML = '<option value="">Selecciona una estación</option>';
-    if (!a) { selEstacion.disabled = true; return; }
-    var e = uniques(datosConfiguracion.filter(function(f) { return f.cliente === c && f.proyecto === p && f.actividad === a; }).map(function(f) { return f.estacion; }));
-    selEstacion.innerHTML += e.map(function(i) { return '<option value="' + i + '">' + i + '</option>'; }).join("");
-    selEstacion.disabled = false;
-  });
-
-  function renderizarBloqueFotos() {
-    var contenedor = document.getElementById("listaFotosEstructurada"); contenedor.innerHTML = "";
-    estructuraFotos.forEach(function(foto, idx) {
-      var row = document.createElement("div"); row.className = "foto-item-row";
-      var headerRow = document.createElement("div"); headerRow.className = "foto-item-header";
-      var info = document.createElement("div"); info.className = "foto-item-info";
-      var t = document.createElement("div"); t.className = "foto-item-title"; t.textContent = foto.item;
-      var est = document.createElement("div"); est.className = "foto-item-status";
-      
-      if (foto.estado === "PENDIENTE") { est.textContent = "❌ Pendiente local"; est.className += " status-pendiente"; }
-      else if (foto.estado === "TOMADA") { est.textContent = "📸 " + foto.fotosList.length + " por guardar"; est.className += " status-tomada"; }
-      else if (foto.estado === "SUBIDA") { est.textContent = "☁ Sincronizada en SharePoint (" + foto.fotosList.length + ")"; est.className += " status-subida"; }
-      else if (foto.estado === "NA") { est.textContent = "🚫 No Aplica"; est.className += " status-na"; }
-
-      info.appendChild(t); info.appendChild(est); headerRow.appendChild(info);
-
-      var acts = document.createElement("div"); acts.className = "foto-item-actions-layout";
-      var bF = document.createElement("button"); bF.type = "button"; bF.className = "btn-accion-foto"; bF.textContent = "📷 Añadir";
-      
-      // DESPLEGAR EL MENÚ DE SELECCIÓN DE ORIGEN
-      bF.addEventListener("click", function() { 
-        indiceItemSeleccionado = idx; 
-        document.getElementById("modalOrigenFoto").classList.remove("oculto");
-      });
-      
-      var bN = document.createElement("button"); bN.type = "button"; bN.className = "btn-accion-na"; bN.textContent = "N/A";
-      bN.addEventListener("click", function() { estructuraFotos[idx].estado = "NA"; estructuraFotos[idx].fotosList = []; renderizarBloqueFotos(); });
-      
-      acts.appendChild(bF); acts.appendChild(bN); headerRow.appendChild(acts); row.appendChild(headerRow);
-
-      if (foto.fotosList.length > 0) {
-        var tc = document.createElement("div"); tc.className = "thumbs-container";
-        foto.fotosList.forEach(function(fObj, fIdx) {
-          var wrap = document.createElement("div"); wrap.className = "thumb-wrapper";
-          var img = document.createElement("img"); img.src = fObj.previewUrl; 
-          img.addEventListener("click", function() { abrirVisorGrande(fObj.previewUrl); });
-          wrap.appendChild(img);
-
-          var bD = document.createElement("button"); bD.className = "btn-borrar-foto"; bD.type = "button"; bD.textContent = "×";
-          bD.addEventListener("click", function() { eliminarFotoEspecifica(idx, fIdx); });
-          wrap.appendChild(bD); tc.appendChild(wrap);
-        });
-        row.appendChild(tc);
-      }
-      contenedor.appendChild(row);
-    });
-  }
-
-  // ACCIONES DEL MENÚ DE ORIGEN DE FOTOS
-  document.getElementById("btnLlamarCamara").addEventListener("click", function() {
-    document.getElementById("modalOrigenFoto").classList.add("oculto");
-    document.getElementById("inputCapturaCamara").click();
-  });
-  document.getElementById("btnLlamarGaleria").addEventListener("click", function() {
-    document.getElementById("modalOrigenFoto").classList.add("oculto");
-    document.getElementById("inputCapturaGaleria").click();
-  });
-  document.getElementById("btnCancelarOrigen").addEventListener("click", function() {
-    document.getElementById("modalOrigenFoto").classList.add("oculto");
-  });
-
-  function eliminarFotoEspecifica(itemIdx, fotoIdx) {
-    var item = estructuraFotos[itemIdx];
-    if (item.fotosList[fotoIdx] && item.fotosList[fotoIdx].previewUrl) { URL.revokeObjectURL(item.fotosList[fotoIdx].previewUrl); }
-    item.fotosList.splice(fotoIdx, 1);
-    if (item.fotosList.length === 0) item.estado = "PENDIENTE";
-    renderizarBloqueFotos();
-  }
-
-  function abrirVisorGrande(url) {
-    var modal = document.getElementById("modalVisorGrande");
-    document.getElementById("imgVisorGrandeTarget").src = url;
-    modal.classList.remove("oculto");
-  }
-  document.getElementById("modalVisorGrande").addEventListener("click", function() { this.classList.add("oculto"); });
-
-  // PROCESAR FOTOS (COMÚN PARA AMBOS INPUTS)
-  function procesarArchivosSeleccionados(files) {
-    if (files.length > 0 && indiceItemSeleccionado !== null) {
-      var itemActual = estructuraFotos[indiceItemSeleccionado];
-      itemActual.estado = "TOMADA";
-      var est = selEstacion.value || "SITIO GENERAL", g = ubicacionCapturada || "Sin GPS", h = new Date().toLocaleString();
-      
-      files.forEach(function(f) {
-        procesandoMarcasDeAgua++;
-        estamparMarcaDeAgua(f, g, est, h, function(b) {
-          if (b) itemActual.fotosList.push({ file: b, previewUrl: URL.createObjectURL(b), subido: false, filename: "" });
-          procesandoMarcasDeAgua--; renderizarBloqueFotos();
-        });
-      });
-    }
-  }
-
-  document.getElementById("inputCapturaCamara").addEventListener("change", function(e) {
-    procesarArchivosSeleccionados(Array.from(e.target.files)); e.target.value = "";
-  });
-  document.getElementById("inputCapturaGaleria").addEventListener("change", function(e) {
-    procesarArchivosSeleccionados(Array.from(e.target.files)); e.target.value = "";
-  });
-
-  function estamparMarcaDeAgua(f, c, e, h, cb) {
-    var r = new FileReader(); r.readAsDataURL(f);
-    r.onload = function(ev) {
-      var img = new Image(); img.src = ev.target.result;
-      img.onload = function() {
-        var canvas = document.createElement("canvas"); var ctx = canvas.getContext("2d");
-        canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0, img.width, img.height);
-        var ac = Math.max(70, Math.round(canvas.height * 0.09)), tf = Math.max(15, Math.round(ac * 0.24));
-        ctx.fillStyle = "rgba(0, 0, 0, 0.65)"; ctx.fillRect(0, canvas.height - ac, canvas.width, ac);
-        ctx.fillStyle = "#FFFFFF"; ctx.font = "bold " + tf + "px Arial"; ctx.textBaseline = "middle";
-        ctx.fillText("ESTACIÓN: " + e.toUpperCase(), Math.round(canvas.width * 0.04), canvas.height - (ac * 0.68));
-        ctx.fillText("GPS: " + c + "  |  " + h, Math.round(canvas.width * 0.04), canvas.height - (ac * 0.32));
-        canvas.toBlob(function(b) { cb(b); }, "image/jpeg", 0.90);
-      };
-    };
-  }
-
-  function limpiarNombre(t) { return t.replace(/[\\/:*?"<>|]/g, "-").trim(); }
-  
-  function obtenerRutaCarpetaInspeccion() {
-    var c = selCliente.value || "CLIENTE_SITIO", p = selProyecto.value || "PROYECTO_SITIO";
-    var t = document.getElementById("inpTecnico").value.trim() || "TECNICO", f = document.getElementById("inpFecha").value || "FECHA";
-    return CONFIG.carpetaRaizInspecciones + "/" + limpiarNombre(c) + "/" + limpiarNombre(p) + "/" + f + "_" + limpiarNombre(selEstacion.value || "SITIO") + "_" + limpiarNombre(t);
-  }
-
-  // BOTÓN GUARDAR BLOQUE 1
-  document.getElementById("btnGuardarBloque1").addEventListener("click", function() {
-    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) {
-      alert("Faltan datos de ubicación o nombre del técnico."); return;
-    }
-    var ov = document.getElementById("estadoEnvio"); var oT = document.getElementById("estadoEnvioTexto");
-    ov.classList.remove("oculto"); var rb = obtenerRutaCarpetaInspeccion();
-
-    obtenerToken().then(function(token) {
-      var list = [];
-      estructuraFotos.forEach(function(item) {
-        if (item.estado === "TOMADA" || item.estado === "SUBIDA") {
-          item.fotosList.forEach(function(fObj, idx) {
-            if (!fObj.subido) {
-              var nArch = limpiarNombre(item.item).replace(/\s+/g, "_").toLowerCase() + "_" + (idx + 1) + ".jpg";
-              fObj.filename = nArch;
-              list.push({ ruta: rb + "/fotos/" + nArch, file: fObj.file, itemRef: item, fotoRef: fObj });
-            }
-          });
+async function cargarCatalogoCSV() {
+    var estado = document.getElementById("estado");
+    try {
+        // Truco anti-cache (?nocache=...) para obligar al navegador a leer el archivo nuevo
+        var urlConCacheBuster = CONFIG.archivoConfiguracion + "?nocache=" + new Date().getTime();
+        
+        var respuesta = await fetch(urlConCacheBuster);
+        if (!respuesta.ok) {
+            throw new Error("No se pudo encontrar el archivo " + CONFIG.archivoConfiguracion + " en el servidor.");
         }
-      });
+        
+        var textoCSV = await respuesta.text();
+        procesarYRenderizarCSV(textoCSV);
+        
+    } catch (error) {
+        console.error(error);
+        estado.className = "error";
+        estado.textContent = "Error al iniciar el formulario: " + error.message;
+    }
+}
 
-      if (list.length === 0) { ov.classList.add("oculto"); alert("No hay fotos nuevas por guardar."); return; }
-      var i = 0;
-      function secuencial() {
-        if (i >= list.length) return Promise.resolve();
-        oT.textContent = "Subiendo archivo " + (i + 1) + " de " + list.length + "...";
-        var el = list[i];
-        return subirArchivo(token, el.ruta, el.file).then(function() {
-          el.fotoRef.subido = true; el.itemRef.estado = "SUBIDA"; i++; return secuencial();
-        });
-      }
-      return secuencial().then(function() { ov.classList.add("oculto"); alert("¡Fotos guardadas!"); renderizarBloqueFotos(); });
-    }).catch(function(e) { ov.classList.add("oculto"); alert("Error: " + e.message); });
-  });
-
-  document.getElementById("btnSincronizarCambiosEscritorio").addEventListener("click", function() {
-    if (!selCliente.value || !selEstacion.value) { alert("Configure la ubicación para verificar."); return; }
-    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Sincronizando con Supervisor...";
-    var rb = obtenerRutaCarpetaInspeccion() + "/fotos";
-
-    obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb + ":/children", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.ok ? r.json() : { value: [] }; })
-        .then(function(json) {
-          var archivosEnNube = json.value.map(function(itemNube) { return itemNube.name; });
-          estructuraFotos.forEach(function(item) {
-            if (item.estado === "SUBIDA") {
-              item.fotosList = item.fotosList.filter(function(fObj) { return archivosEnNube.includes(fObj.filename); });
-              if (item.fotosList.length === 0) item.estado = "PENDIENTE";
-            }
-          });
-          ov.classList.add("oculto"); alert("Sincronización terminada."); renderizarBloqueFotos();
-        });
-    }).catch(function() { ov.classList.add("oculto"); });
-  });
-
-  document.getElementById("btnEnviar").addEventListener("click", function() {
-    if (!selCliente.value || !selEstacion.value || !document.getElementById("inpTecnico").value.trim()) { alert("Complete todos los campos."); return; }
-    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Consolidando reporte técnico...";
-    var rb = obtenerRutaCarpetaInspeccion();
-    var d = { cliente: selCliente.value, proyecto: selProyecto.value, actividad: selActividad.value, estacion: selEstacion.value, tecnico: document.getElementById("inpTecnico").value.trim(), fecha: document.getElementById("inpFecha").value, notas: document.getElementById("inpNotas").value.trim() };
-
-    obtenerToken().then(function(token) {
-      var csv = "REPORTE DE INSPECCION\nCampo;Valor\nCliente;" + d.cliente + "\nEstacion;" + d.estacion + "\nTecnico;" + d.tecnico + "\nGPS;" + (ubicacionCapturada || "Sin GPS");
-      return subirArchivo(token, rb + "/reporte_inspeccion.csv", new Blob(["\uFEFF" + csv], { type: "text/csv;" }))
-        .then(function() { return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rb, { headers: { Authorization: "Bearer " + token } }).then(function(r){return r.json();}); })
-        .then(function(j) { return registrarFilaTextoPlano(token, { fecha: d.fecha, tecnico: d.tecnico, cliente: d.cliente, proyecto: d.proyecto, actividad: d.actividad, estacion: d.estacion, ubicacion: ubicacionCapturada || "Sin GPS", linkCarpeta: j.webUrl || "" }); })
-        .then(function() {
-          ov.classList.add("oculto"); document.getElementById("appPrincipal").classList.add("oculto");
-          document.getElementById("pantallaExito").classList.remove("oculto"); document.getElementById("exitoDetalle").textContent = "Inspección consolidada indexada.";
-        });
-    }).catch(function(e) { ov.classList.add("oculto"); alert(e.message); });
-  });
-
-// =======================================================
-  // BUSCADOR EN TIEMPO REAL PARA SUPERVISOR (SIN RETRASO DE INDEXACIÓN)
-  // =======================================================
-  document.getElementById("btnCargarCarpetasActivas").addEventListener("click", function() {
-    if (!driveId) { alert("El Drive aún no se ha inicializado."); return; }
-    var ov = document.getElementById("estadoEnvio"); ov.classList.remove("oculto");
-    document.getElementById("estadoEnvioTexto").textContent = "Rastreando inspecciones en tiempo real...";
+function procesarYRenderizarCSV(texto) {
+    var contenedor = document.getElementById("formularioContenedor");
+    var estado = document.getElementById("estado");
+    var lineas = texto.split(/\r?\n/);
     
-    var listaSelect = document.getElementById("selCarpetaMonitoreo");
-    listaSelect.innerHTML = '<option value="">Selecciona una carpeta activa en campo</option>';
+    var bloqueActual = null;
+    var divBloqueActual = null;
+    var subtituloActual = null;
+    var contadorInput = 0;
 
-    obtenerToken().then(function(token) {
-      // 1. Listar los clientes (primer nivel dentro de Inspecciones)
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.carpetaRaizInspecciones + ":/children", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.ok ? r.json() : { value: [] }; })
-        .then(function(resClientes) {
-          var promesasProyectos = [];
-          
-          resClientes.value.forEach(function(itemCliente) {
-            if (itemCliente.folder) {
-              var rutaCliente = CONFIG.carpetaRaizInspecciones + "/" + itemCliente.name;
-              // 2. Para cada cliente, listar sus proyectos
-              var p = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaCliente + ":/children", { headers: { Authorization: "Bearer " + token } })
-                .then(function(r) { return r.ok ? r.json() : { value: [] }; })
-                .then(function(resProyectos) {
-                  var promesasSitios = [];
-                  
-                  resProyectos.value.forEach(function(itemProyecto) {
-                    if (itemProyecto.folder) {
-                      var rutaProyecto = rutaCliente + "/" + itemProyecto.name;
-                      // 3. Para cada proyecto, listar las carpetas de inspección finales
-                      var s = fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaProyecto + ":/children", { headers: { Authorization: "Bearer " + token } })
-                        .then(function(r) { return r.ok ? r.json() : { value: [] }; })
-                        .then(function(resSitios) {
-                          resSitios.value.forEach(function(itemSitio) {
-                            // Validamos que sea una carpeta de inspección (contiene guiones bajos de fecha/técnico)
-                            if (itemSitio.folder && itemSitio.name.includes("_")) {
-                              var opt = document.createElement("option");
-                              opt.value = rutaProyecto + "/" + itemSitio.name + "/fotos";
-                              opt.textContent = "📍 Sitio: " + itemSitio.name;
-                              listaSelect.appendChild(opt);
-                            }
-                          });
-                        });
-                      promesasSitios.push(s);
-                    }
-                  });
-                  return Promise.all(promesasSitios);
-                });
-              promesasProyectos.push(p);
+    // Recorremos el CSV línea por línea
+    for (var i = 0; i < lineas.length; i++) {
+        var linea = lineas[i].trim();
+        if (linea === "" || linea.indexOf(",") === -1) continue;
+
+        // Separar por columnas (Bloque, Subtítulo, Foto)
+        var columnas = linea.split(",");
+        var nombreBloque = columnas[0] ? columnas[0].trim() : "";
+        var nombreSubtitulo = columnas[1] ? columnas[1].trim() : "";
+        var nombreFoto = columnas[2] ? columnas[2].trim() : "";
+
+        // 1. Detectar o cambiar de Bloque
+        if (nombreBloque && nombreBloque !== bloqueActual) {
+            bloqueActual = nombreBloque;
+            subtituloActual = null; // Reiniciar subtítulo para el nuevo bloque
+            
+            divBloqueActual = document.createElement("div");
+            divBloqueActual.className = "bloque";
+            
+            var h3 = document.createElement("h3");
+            h3.className = "titulo-bloque";
+            h3.textContent = bloqueActual;
+            divBloqueActual.appendChild(h3);
+            contenedor.appendChild(divBloqueActual);
+        }
+
+        // 2. Detectar o cambiar de Subtítulo dentro del bloque
+        if (nombreSubtitulo && nombreSubtitulo !== subtituloActual && divBloqueActual) {
+            subtituloActual = nombreSubtitulo;
+            
+            var divSubt = document.createElement("div");
+            divSubt.className = "subtitulo-seccion";
+            divSubt.textContent = subtituloActual;
+            divBloqueActual.appendChild(divSubt);
+        }
+
+        // 3. Crear el campo para la Fotografía
+        if (nombreFoto && divBloqueActual) {
+            var divFoto = document.createElement("div");
+            divFoto.className = "foto-item";
+            
+            var label = document.createElement("label");
+            label.textContent = "📷 " + nombreFoto;
+            
+            var input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+            input.setAttribute("capture", "environment");
+            
+            // Generar nombre limpio para almacenar en SharePoint (B1_Nombre_Foto.jpg)
+            var bNum = bloqueActual.split(' ')[1] ? bloqueActual.split(' ')[1].replace(/[^0-9]/g, '') : "0";
+            var nombreArchivoLimpio = "B" + bNum + "_" + nombreFoto.replace(/[^a-zA-Z0-9]/g, "_");
+            
+            input.setAttribute("data-nombre", nombreArchivoLimpio);
+            input.setAttribute("id", "input_foto_" + contadorInput);
+            
+            divFoto.appendChild(label);
+            divFoto.appendChild(input);
+            divBloqueActual.appendChild(divFoto);
+            
+            contadorInput++;
+        }
+    }
+
+    // Ocultar mensaje de carga y activar botón de envío
+    estado.style.display = "none";
+    document.getElementById("btnEnviar").disabled = false;
+}
+
+// ==========================================
+// ENVÍO DE DATOS A POWER AUTOMATE
+// ==========================================
+document.getElementById("btnEnviar").addEventListener("click", async function() {
+    var btn = document.getElementById("btnEnviar");
+    var estado = document.getElementById("estado");
+    
+    btn.disabled = true;
+    estado.style.display = "block";
+    estado.className = "info";
+    estado.textContent = "Preparando empaquetado de reporte...";
+
+    try {
+        var formData = new FormData();
+        var fechaHoy = new Date().toISOString().split('T')[0];
+        var rutaCarpetaFinal = CONFIG.carpetaRaizInspecciones + "/" + fechaHoy + "_Inspeccion";
+        
+        formData.append("rutaCarpeta", rutaCarpetaFinal);
+
+        var inputs = document.querySelectorAll('input[type="file"]');
+        var totalArchivos = 0;
+
+        for (var m = 0; m < inputs.length; m++) {
+            var input = inputs[m];
+            if (input.files && input.files.length > 0) {
+                var archivo = input.files[0];
+                var nombreFinal = input.getAttribute("data-nombre") + ".jpg";
+                
+                formData.append("archivo_" + m, archivo, nombreFinal);
+                totalArchivos++;
             }
-          });
-          
-          return Promise.all(promesasProyectos);
-        })
-        .then(function() {
-          ov.classList.add("oculto");
-          if (listaSelect.options.length <= 1) {
-            alert("No se encontraron carpetas de inspección creadas en la ruta estándar de SharePoint.");
-          } else {
-            alert("Rastreo en tiempo real completado. Sitios listados con éxito.");
-          }
+        }
+
+        if (totalArchivos === 0) {
+            throw new Error("Por favor, capture al menos una fotografía antes de realizar el envío.");
+        }
+
+        estado.textContent = "Transmitiendo " + totalArchivos + " imágenes a SharePoint...";
+
+        var respuesta = await fetch(CONFIG.webhookUrl, {
+            method: "POST",
+            body: formData
         });
-    }).catch(function(e) { 
-      ov.classList.add("oculto"); 
-      alert("Error en el rastreo: " + e.message); 
-    });
-  });
 
-  var selMonitoreo = document.getElementById("selCarpetaMonitoreo");
-  selMonitoreo.addEventListener("change", cargarGaleriaSupervisor);
+        if (!respuesta.ok) {
+            throw new Error("Power Automate rechazó la carga (" + respuesta.status + ")");
+        }
 
-  function cargarGaleriaSupervisor() {
-    var rutaFotos = selMonitoreo.value; if (!rutaFotos) { document.getElementById("cardGaleriaSupervisor").classList.add("oculto"); return; }
-    var galeria = document.getElementById("galeriaFotosSupervisor"); galeria.innerHTML = "Cargando fotos del sitio...";
-    document.getElementById("cardGaleriaSupervisor").classList.remove("oculto");
+        estado.className = "success";
+        estado.textContent = "¡Reporte enviado con éxito! Se cargaron " + totalArchivos + " fotografías en la carpeta de SharePoint.";
 
-    obtenerToken().then(function(token) {
-      return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + rutaFotos + ":/children", { headers: { Authorization: "Bearer " + token } })
-        .then(function(r) { return r.json(); })
-        .then(function(json) {
-          galeria.innerHTML = ""; if (!json.value || json.value.length === 0) { galeria.innerHTML = "Sin fotos guardadas todavía."; return; }
-          
-          json.value.forEach(function(archivo) {
-            var card = document.createElement("div"); card.className = "card-foto-superv";
-            var img = document.createElement("img"); img.src = archivo["@microsoft.graph.downloadUrl"];
-            img.addEventListener("click", function() { window.open(archivo.webUrl, "_blank"); });
-
-            var meta = document.createElement("div"); meta.className = "meta";
-            meta.textContent = archivo.name.replace(/_/g, " ").replace(".jpg", "");
-
-            var btnR = document.createElement("button"); btnR.className = "btn-rechazar-superv"; btnR.textContent = "🗑 Rechazar / Eliminar";
-            btnR.addEventListener("click", function() {
-              if (confirm("¿Deseas eliminar esta foto de SharePoint?")) {
-                var urlBorrar = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/items/" + archivo.id;
-                fetch(urlBorrar, { method: "DELETE", headers: { Authorization: "Bearer " + token } }).then(function(r) {
-                  if (r.ok) { alert("Foto eliminada."); cargarGaleriaSupervisor(); }
-                });
-              }
-            });
-            card.appendChild(img); card.appendChild(meta); card.appendChild(btnR); galeria.appendChild(card);
-          });
-        });
-    });
-  }
-
-  function subirArchivo(token, ruta, contenido) {
-    return fetch("https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + ruta + ":/content", {
-      method: "PUT", headers: { Authorization: "Bearer " + token, "Content-Type": "application/octet-stream" }, body: contenido
-    }).then(function(r) { return r.json(); });
-  }
-
-  function registrarFilaTextoPlano(token, fila) {
-    var url = "https://graph.microsoft.com/v1.0/drives/" + driveId + "/root:/" + CONFIG.archivoMaestro + ":/content";
-    return fetch(url, { headers: { Authorization: "Bearer " + token } }).then(function(r) {
-      var nF = fila.fecha + ";" + fila.tecnico + ";" + fila.cliente + ";" + fila.proyecto + ";" + fila.actividad + ";" + fila.estacion + ";" + fila.ubicacion + ";" + fila.linkCarpeta + "\r\n";
-      if (!r.ok) return subirArchivo(token, CONFIG.archivoMaestro, new Blob(["\uFEFFFecha;Tecnico;Cliente;Proyecto;Actividad;Estacion;Ubicacion;Link_Carpeta\n" + nF], { type: "text/csv;" }));
-      return r.text().then(function(txt) { return subirArchivo(token, CONFIG.archivoMaestro, new Blob([txt + (txt.endsWith("\n") ? "" : "\n") + nF], { type: "text/csv;" })); });
-    });
-  }
-
-  document.getElementById("btnNuevaInspeccion").addEventListener("click", function() { window.location.reload(); });
-}
-
-function esperarMSAL(intentos) {
-  if (typeof msal !== "undefined") { iniciarApp(); }
-  else if (intentos > 0) { setTimeout(function() { esperarMSAL(intentos - 1); }, 400); }
-}
-window.addEventListener("load", function() { esperarMSAL(25); });
+    } catch (error) {
+        console.error(error);
+        estado.className = "error";
+        estado.textContent = "Error: " + error.message;
+    } finally {
+        btn.disabled = false;
+    }
+});
 </script>
 </body>
 </html>
